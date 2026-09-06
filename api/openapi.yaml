@@ -1,0 +1,279 @@
+openapi: 3.0.3
+
+info:
+  title: Delta Task API
+  description: |
+    Task management contract for the Delta interview project.
+
+    This file is the single source of truth for the whole monorepo:
+
+      - `backend/`  generates Spring MVC interfaces + models from it (openapi-generator).
+      - `frontend/` generates TypeScript types from it (openapi-typescript).
+
+    Neither side hand-writes its transport types. Change this file, run
+    `pnpm generate` and `mvn compile`, and both sides fail to compile until
+    they agree with the contract again.
+  version: 1.0.0
+  license:
+    name: Proprietary
+
+servers:
+  - url: http://localhost:8080
+    description: Local backend
+  - url: http://localhost:5173
+    description: Local Vite dev server (proxies /api to the backend)
+
+tags:
+  - name: tasks
+    description: Create, inspect, modify, complete and delete tasks.
+
+paths:
+  /api/tasks:
+    get:
+      tags: [tasks]
+      operationId: listTasks
+      summary: 檢視任務 — list tasks, optionally filtered by completion state.
+      description: |
+        Filtering happens server-side rather than in the client so that a large
+        task set never has to cross the wire just to be discarded by the UI.
+      parameters:
+        - name: completed
+          in: query
+          required: false
+          description: Omit for all tasks; `true`/`false` to filter by state.
+          schema:
+            type: boolean
+      responses:
+        '200':
+          description: The matching tasks, newest first.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Task'
+
+    post:
+      tags: [tasks]
+      operationId: createTask
+      summary: 建立任務 — create a task.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateTaskRequest'
+      responses:
+        '201':
+          description: The created task.
+          headers:
+            Location:
+              description: URL of the created task.
+              schema:
+                type: string
+                format: uri-reference
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Task'
+        '400':
+          $ref: '#/components/responses/ValidationFailed'
+
+  /api/tasks/{id}:
+    parameters:
+      - $ref: '#/components/parameters/TaskId'
+
+    get:
+      tags: [tasks]
+      operationId: getTask
+      summary: 檢視任務 — fetch a single task.
+      responses:
+        '200':
+          description: The requested task.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Task'
+        '404':
+          $ref: '#/components/responses/TaskNotFound'
+
+    put:
+      tags: [tasks]
+      operationId: updateTask
+      summary: 修改任務 — replace a task's editable fields.
+      description: |
+        Deliberately a full replace of the editable fields (title, description)
+        rather than a partial patch: completion state is owned by
+        `PATCH /api/tasks/{id}/completion`, so an edit form can never silently
+        reopen or close a task as a side effect of saving a title.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateTaskRequest'
+      responses:
+        '200':
+          description: The updated task.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Task'
+        '400':
+          $ref: '#/components/responses/ValidationFailed'
+        '404':
+          $ref: '#/components/responses/TaskNotFound'
+
+    delete:
+      tags: [tasks]
+      operationId: deleteTask
+      summary: 刪除任務 — delete a task.
+      responses:
+        '204':
+          description: Deleted; no body.
+        '404':
+          $ref: '#/components/responses/TaskNotFound'
+
+  /api/tasks/{id}/completion:
+    parameters:
+      - $ref: '#/components/parameters/TaskId'
+
+    patch:
+      tags: [tasks]
+      operationId: setTaskCompletion
+      summary: 將任務標記為已完成或未完成 — set completion state.
+      description: |
+        Takes an explicit boolean rather than toggling. A toggle derives the new
+        state from whatever the server currently holds, so two rapid clicks (or
+        two devices) race to an unpredictable result; an explicit target state
+        is idempotent.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TaskCompletionRequest'
+      responses:
+        '200':
+          description: The task in its new completion state.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Task'
+        '400':
+          $ref: '#/components/responses/ValidationFailed'
+        '404':
+          $ref: '#/components/responses/TaskNotFound'
+
+components:
+  parameters:
+    TaskId:
+      name: id
+      in: path
+      required: true
+      description: Task identifier.
+      schema:
+        type: string
+        format: uuid
+
+  responses:
+    TaskNotFound:
+      description: No task exists with that id.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    ValidationFailed:
+      description: The request body failed validation.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+
+  schemas:
+    Task:
+      type: object
+      description: A task as stored by the backend.
+      required: [id, title, completed, createdAt, updatedAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+          example: 3f1a7c2e-9b04-4f5d-8a11-6c2d5e0f7b31
+        title:
+          type: string
+          minLength: 1
+          maxLength: 200
+          example: Write the OpenAPI contract
+        description:
+          type: string
+          maxLength: 2000
+          nullable: true
+          example: Cover all five task operations.
+        completed:
+          type: boolean
+          example: false
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    CreateTaskRequest:
+      type: object
+      description: Payload for creating a task; new tasks always start incomplete.
+      required: [title]
+      properties:
+        title:
+          type: string
+          minLength: 1
+          maxLength: 200
+        description:
+          type: string
+          maxLength: 2000
+          nullable: true
+
+    UpdateTaskRequest:
+      type: object
+      description: Payload for replacing a task's editable fields.
+      required: [title]
+      properties:
+        title:
+          type: string
+          minLength: 1
+          maxLength: 200
+        description:
+          type: string
+          maxLength: 2000
+          nullable: true
+
+    TaskCompletionRequest:
+      type: object
+      description: Target completion state for a task.
+      required: [completed]
+      properties:
+        completed:
+          type: boolean
+
+    Problem:
+      type: object
+      description: RFC 9457 problem details, as produced by Spring's ProblemDetail.
+      required: [status, title]
+      properties:
+        type:
+          type: string
+          format: uri-reference
+        title:
+          type: string
+          example: Not Found
+        status:
+          type: integer
+          format: int32
+          example: 404
+        detail:
+          type: string
+          example: No task exists with id 3f1a7c2e-9b04-4f5d-8a11-6c2d5e0f7b31.
+        instance:
+          type: string
+          format: uri-reference

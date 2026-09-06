@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  範例：Maven JDK toolchain 設定
+  複製到 ~/.m2/toolchains.xml，並把 <jdkHome> 換成你機器上的 JDK 21 路徑。
+
+  用途：讓建置固定使用 JDK 21，而不跟著「Maven 剛好啟動在哪個 JDK」跑。
+  本專案的 pom.xml 要求 [21,26)，找不到符合的 toolchain 就會直接建置失敗，
+  不會默默退回較新的預設 JDK。
+
+  macOS / Homebrew 需要這個檔案，因為 keg-only 的 openjdk@21 不會安裝到
+  /Library/Java/JavaVirtualMachines，Maven 的自動探測看不到它。
+  若你的 JDK 21 安裝在標準位置（Linux 發行版套件、SDKMAN、Temurin .pkg 等），
+  Maven 通常可自動探測，這個檔案就不需要。
+
+  查看目前能被探測到的 JDK：
+    mvn org.apache.maven.plugins:maven-toolchains-plugin:3.3.0:display-discovered-jdk-toolchains
+-->
+<toolchains xmlns="http://maven.apache.org/TOOLCHAINS/1.1.0"
+            xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+            xsi:schemaLocation="http://maven.apache.org/TOOLCHAINS/1.1.0 https://maven.apache.org/xsd/toolchains-1.1.0.xsd">
+  <toolchain>
+    <type>jdk</type>
+    <provides>
+      <version>21.0.11</version>
+      <vendor>Homebrew</vendor>
+    </provides>
+    <configuration>
+      <!-- macOS / Homebrew: /opt/homebrew/opt/openjdk@21/libexec/openjdk.jdk/Contents/Home -->
+      <jdkHome>/opt/homebrew/opt/openjdk@21/libexec/openjdk.jdk/Contents/Home</jdkHome>
+    </configuration>
+  </toolchain>
+</toolchains>

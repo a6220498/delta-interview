@@ -1,0 +1,43 @@
+@import 'tailwindcss';
+
+/*
+ * Tailwind 4 has no tailwind.config.js — the design tokens live here.
+ * Utilities such as `bg-surface`, `text-muted`, `border-line` and
+ * `bg-danger/10` are generated from these custom properties.
+ */
+@theme {
+  --color-canvas: #f6f7f9;
+  --color-surface: #ffffff;
+  --color-line: #e3e6ea;
+  --color-ink: #17191c;
+  --color-muted: #5f6672;
+  --color-accent: #2f6df6;
+  --color-accent-ink: #ffffff;
+  --color-success: #16794c;
+  --color-danger: #c02626;
+
+  --radius-panel: 0.75rem;
+}
+
+/*
+ * Dark mode redefines the same tokens rather than adding `dark:` variants, so
+ * templates stay free of theme branching — every utility above follows along.
+ */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color-canvas: #101319;
+    --color-surface: #171b23;
+    --color-line: #2a313d;
+    --color-ink: #eef1f6;
+    --color-muted: #9aa3b2;
+    --color-accent: #6f9bff;
+    --color-accent-ink: #0b0e14;
+    --color-success: #4ec08a;
+    --color-danger: #f2706b;
+  }
+}
+
+body {
+  background-color: var(--color-canvas);
+  color: var(--color-ink);
+}

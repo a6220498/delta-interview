@@ -1,0 +1,26 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: delta-interview-backend
+  mvc:
+    # Renders validation and malformed-body failures as RFC 9457 problem details,
+    # matching the contract's `Problem` schema without hand-written handlers.
+    problemdetails:
+      enabled: true
+  jackson:
+    serialization:
+      write-dates-as-timestamps: false
+
+springdoc:
+  # Contract-first: Swagger UI renders api/openapi.yaml itself (copied onto the
+  # classpath at build time), not a spec reconstructed from annotations.
+  swagger-ui:
+    path: /swagger-ui.html
+    url: /openapi.yaml
+    disable-swagger-default-url: true
+
+logging:
+  level:
+    com.delta.interview: DEBUG

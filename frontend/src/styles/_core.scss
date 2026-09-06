@@ -1,0 +1,15 @@
+// Shared SCSS available to every component as `@use 'core' as core;`
+// (resolved through Vite's `css.preprocessorOptions.scss.loadPaths`).
+//
+// Tailwind covers layout, spacing, colour and state. Only what Tailwind cannot
+// express belongs here — per the project styling rules.
+
+/// Applies an animation, but honours a user's reduced-motion preference.
+///
+/// Tailwind can attach an animation but cannot express "…unless the user asked
+/// for less motion", and silently ignoring that preference fails WCAG 2.3.3.
+@mixin motion-safe-animation($value) {
+  @media (prefers-reduced-motion: no-preference) {
+    animation: $value;
+  }
+}

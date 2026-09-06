@@ -1,0 +1,21 @@
+{
+  "name": "delta-interview",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Monorepo: Vue 3 frontend + Spring Boot 3 backend, both driven by one OpenAPI contract.",
+  "engines": {
+    "node": ">=20",
+    "pnpm": ">=10"
+  },
+  "scripts": {
+    "generate": "pnpm --filter frontend generate",
+    "dev": "pnpm --filter frontend dev",
+    "build": "pnpm --filter frontend build",
+    "test": "pnpm --filter frontend test",
+    "lint": "pnpm --filter frontend lint",
+    "backend:dev": "mvn -f backend/pom.xml spring-boot:run",
+    "backend:build": "mvn -f backend/pom.xml clean verify",
+    "backend:test": "mvn -f backend/pom.xml test"
+  },
+  "packageManager": "pnpm@10.25.0"
+}
