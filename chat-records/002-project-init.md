@@ -1,7 +1,7 @@
 # 對話紀錄 — 建立 Monorepo 專案骨架（Delta 面試作業）
 
 > 範圍：專案初始化階段 —— 自「起一個 monorepo 專案」起，至第一次 commit `f45910b` 為止。
-> 設計階段（UIUX）的對話另見 [screen-design.md](./screen-design.md)。
+> 設計階段（UIUX）的對話另見 [001-screen-design.md](./001-screen-design.md)。
 >
 > **關於完整性**：本檔保留使用者訊息全文與 Claude 的實質回覆全文。
 > Claude 在連續工具呼叫之間的過場語句（如「Now the backend test:」這類單句）

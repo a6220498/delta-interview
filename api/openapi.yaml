@@ -101,11 +101,18 @@ paths:
       tags: [tasks]
       operationId: updateTask
       summary: 修改任務 — replace a task's editable fields.
+      # [AI assisted 003] 「改類別時從目標類別的計數器重新發號」這條規則，是與 AI 討論
+      # 「兩個計數器獨立之後，沿用舊號會不會撞號」推導出來的，結論一併寫進本說明。
       description: |
-        Deliberately a full replace of the editable fields (title, description)
-        rather than a partial patch: completion state is owned by
-        `PATCH /api/tasks/{id}/completion`, so an edit form can never silently
-        reopen or close a task as a side effect of saving a title.
+        Deliberately a full replace of the editable fields (title, description,
+        category, dueDate) rather than a partial patch: completion state is
+        owned by `PATCH /api/tasks/{id}/completion`, so an edit form can never
+        silently reopen or close a task as a side effect of saving a title.
+
+        Moving a task to the other `category` re-issues its `sequence` from that
+        category's counter, so `feat-0003` becomes e.g. `bug-0007` rather than
+        colliding with an existing `bug-0003`. `id` is untouched, so URLs and
+        in-flight requests survive the move.
       requestBody:
         required: true
         content:
@@ -191,15 +198,51 @@ components:
             $ref: '#/components/schemas/Problem'
 
   schemas:
+    # [AI assisted 003] 使用 AI 協助設計工單編號的契約形狀：id 維持 uuid 給機器用，
+    # 人看的編號改由 category + sequence 這一對組成（兩類別各自計數），並新增 dueDate。
+    TaskCategory:
+      type: string
+      description: |
+        工單類別 — the kind of work a task represents.
+
+        Drives the display number's prefix, the card's colour and the board's
+        grouping. Deliberately a closed enum rather than free text: the two
+        values are a fixed part of the domain, and an enum makes an unknown
+        value a 400 at the boundary instead of an unrenderable card.
+      enum: [bug, feat]
+      example: bug
+
     Task:
       type: object
-      description: A task as stored by the backend.
-      required: [id, title, completed, createdAt, updatedAt]
+      description: |
+        A task as stored by the backend.
+
+        Two identifiers, on purpose. `id` is the machine one — routes, requests,
+        cache keys — and never changes. The number a human reads off the card is
+        the pair (`category`, `sequence`), rendered client-side as `bug-0007` /
+        `feat-0003`. Splitting them means the human-readable number can follow a
+        task's category without ever breaking a URL.
+      required: [id, category, sequence, title, completed, createdAt, updatedAt]
       properties:
         id:
           type: string
           format: uuid
           example: 3f1a7c2e-9b04-4f5d-8a11-6c2d5e0f7b31
+        category:
+          $ref: '#/components/schemas/TaskCategory'
+        sequence:
+          type: integer
+          format: int32
+          minimum: 1
+          description: |
+            Per-category serial, assigned by the server and never accepted from
+            a client. `bug` and `feat` count independently, so a `bug-0001` and
+            a `feat-0001` both exist: it is the pair (`category`, `sequence`)
+            that is unique, not `sequence` on its own.
+
+            Sent as a plain integer; zero-padding to four digits is a
+            presentation concern and belongs to the client.
+          example: 7
         title:
           type: string
           minLength: 1
@@ -213,6 +256,20 @@ components:
         completed:
           type: boolean
           example: false
+        dueDate:
+          type: string
+          format: date
+          nullable: true
+          description: |
+            Optional due date, without a time or zone: a task is due on a day,
+            not at an instant, and a timestamp would make the same task look
+            overdue in one timezone and not in another.
+
+            No `overdue` flag ships with the task — that is
+            `dueDate < today && !completed`, which the client already re-derives
+            every midnight anyway, whereas a server-computed flag would go stale
+            in the browser the moment the date rolled over.
+          example: '2026-09-30'
         createdAt:
           type: string
           format: date-time
@@ -222,8 +279,12 @@ components:
 
     CreateTaskRequest:
       type: object
-      description: Payload for creating a task; new tasks always start incomplete.
-      required: [title]
+      description: |
+        Payload for creating a task; new tasks always start incomplete.
+
+        Carries no `sequence`: the serial is drawn from the chosen category's
+        counter by the server, so a client cannot mint a duplicate number.
+      required: [title, category]
       properties:
         title:
           type: string
@@ -233,11 +294,23 @@ components:
           type: string
           maxLength: 2000
           nullable: true
+        category:
+          $ref: '#/components/schemas/TaskCategory'
+        dueDate:
+          type: string
+          format: date
+          nullable: true
 
     UpdateTaskRequest:
       type: object
-      description: Payload for replacing a task's editable fields.
-      required: [title]
+      description: |
+        Payload for replacing a task's editable fields.
+
+        A full replace, so an omitted `description` or `dueDate` clears it.
+        `category` is required for the same reason: a form that can move a task
+        between categories must state where it lands, and leaving it out would
+        make "no change" and "unset" indistinguishable.
+      required: [title, category]
       properties:
         title:
           type: string
@@ -246,6 +319,12 @@ components:
         description:
           type: string
           maxLength: 2000
+          nullable: true
+        category:
+          $ref: '#/components/schemas/TaskCategory'
+        dueDate:
+          type: string
+          format: date
           nullable: true
 
     TaskCompletionRequest:

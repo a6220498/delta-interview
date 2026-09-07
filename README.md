@@ -93,12 +93,16 @@ Vite 會把 `/api` proxy 到 `localhost:8080`，因此開發環境同源、後�
 | 標記完成 / 未完成 | `PATCH /api/tasks/{id}/completion` |
 | 刪除任務 | `DELETE /api/tasks/{id}` |
 
-兩個刻意的設計決定：
+三個刻意的設計決定：
 
-1. **完成狀態獨立成一個 endpoint**。`PUT /{id}` 只replace 可編輯欄位（標題、描述），
-   儲存編輯表單因此不可能順帶把已完成的任務重新打開。
+1. **完成狀態獨立成一個 endpoint**。`PUT /{id}` 只 replace 可編輯欄位（標題、描述、
+   類別、到期日），儲存編輯表單因此不可能順帶把已完成的任務重新打開。
 2. **`PATCH .../completion` 帶明確的目標狀態，而不是 toggle**。toggle 的結果取決於
    伺服器當下的值，連點兩次或多裝置同時操作會 race；帶明確狀態則是 idempotent。
+   也因為帶的是目標狀態，`{"completed": false}` 本身就是「改回未完成」，
+   **不需要另開一支反向 endpoint** —— 同一件事有兩個入口只會讓兩邊語意慢慢分岔。
+3. **`id` 與工單編號是兩個東西**。`id` 給機器用（路由、請求、快取鍵），永遠不變；
+   人看的編號是 `category` + `sequence` 這一對。詳見〈領域模型〉。
 
 錯誤一律以 RFC 9457 problem details 回傳，對應契約中的 `Problem` schema。
 
@@ -112,15 +116,44 @@ Vite 會把 `/api` proxy 到 `localhost:8080`，因此開發環境同源、後�
 | 欄位 | 契約 | Java | TypeScript | 必填 |
 |---|---|---|---|---|
 | `id` | `string($uuid)` | `UUID` | `string` | ✔（伺服器產生） |
+| `category` | `enum`：`bug` / `feat` | `TaskCategory` | `'bug' \| 'feat'` | ✔ |
+| `sequence` | `integer($int32)`，≥ 1 | `Integer` | `number` | ✔（伺服器產生） |
 | `title` | `string`，1–200 字 | `String` | `string` | ✔ |
 | `description` | `string`，≤ 2000 字，nullable | `@Nullable String` | `string \| null` | — |
 | `completed` | `boolean` | `Boolean` | `boolean` | ✔ |
+| `dueDate` | `string($date)`，nullable | `@Nullable LocalDate` | `string \| null` | — |
 | `createdAt` | `string($date-time)` | `OffsetDateTime` | `string` | ✔（伺服器產生） |
 | `updatedAt` | `string($date-time)` | `OffsetDateTime` | `string` | ✔（伺服器產生） |
 
 長度限制寫在契約裡，後端因此拿到產生出來的 `@Size` / `@NotNull`，違反時由 Spring 直接回
 400 problem details，controller 不需要自己檢查。（`openapi-typescript` 不會把長度帶進型別，
 所以前端 `TaskComposer.vue` 的 `maxlength` 是手寫的 UI 提示，實際把關的仍是後端。）
+標題長度是**驗證**而不是**顯示**：畫面不主動印「還剩幾字」，只有超出上限、驗證沒過時才跳錯誤。
+
+#### 工單編號：`category` + `sequence`
+
+畫面上的工單編號不是一個獨立欄位，而是 `category` 與 `sequence` 這一對算出來的：
+
+```
+`${category}-${String(sequence).padStart(4, '0')}`   →   bug-0007 / feat-0003
+```
+
+補零到四位數是**顯示**行為，由前端負責；契約走的是原始整數，後端不回傳格式化字串。
+
+`bug` 與 `feat` **各有一個獨立的計數器**，所以 `bug-0001` 與 `feat-0001` 會同時存在 ——
+唯一的是（`category`, `sequence`）這一對，不是 `sequence` 本身。
+
+因為兩個計數器獨立，**改類別時會從目標類別的計數器重新發號**：`feat-0003` 改成 `bug`
+會變成例如 `bug-0007`，而不是沿用 `0003` 去跟既有的 `bug-0003` 撞號；原本的號碼直接作廢
+不回收。這件事之所以無痛，正是因為 `id` 是獨立的 uuid：換號不會動到任何網址或飛在路上的請求。
+
+#### `dueDate` 與逾期
+
+`dueDate` 是**日期**不是時間戳：任務是「某天」到期而不是「某個瞬間」到期，帶時區的時間戳
+只會讓同一張單在不同時區看起來一個逾期一個沒有。
+
+契約裡**沒有** `overdue` 旗標。逾期是 `dueDate < 今天 && !completed`，由前端自己算 ——
+伺服器算好的旗標在瀏覽器裡跨過午夜就過期了，而前端本來就要重算。
 
 ### 請求 payload
 
@@ -128,12 +161,17 @@ Vite 會把 `/api` proxy 到 `localhost:8080`，因此開發環境同源、後�
 
 | Schema | 用於 | 欄位 |
 |---|---|---|
-| `CreateTaskRequest` | `POST /api/tasks` | `title`（必填）、`description`；新任務一律未完成 |
-| `UpdateTaskRequest` | `PUT /api/tasks/{id}` | `title`（必填）、`description` |
+| `CreateTaskRequest` | `POST /api/tasks` | `title`、`category`（皆必填）、`description`、`dueDate`；新任務一律未完成 |
+| `UpdateTaskRequest` | `PUT /api/tasks/{id}` | `title`、`category`（皆必填）、`description`、`dueDate` |
 | `TaskCompletionRequest` | `PATCH /api/tasks/{id}/completion` | `completed`（必填） |
 
-`id`、`createdAt`、`updatedAt` 都不在任何 payload 裡，`completed` 也只出現在它自己的
-endpoint —— 上一節那兩個設計決定因此是型別層級的保證，而不只是 controller 裡的約定。
+`id`、`sequence`、`createdAt`、`updatedAt` 都不在任何 payload 裡，`completed` 也只出現在
+它自己的 endpoint —— 上一節那三個設計決定因此是型別層級的保證，而不只是 controller 裡的約定。
+特別是 `sequence`：它不進 payload，客戶端就沒有辦法自己編一個已經有人在用的號碼。
+
+`UpdateTaskRequest` 是整批取代，所以**省略 `description` 或 `dueDate` 等於清空**。
+`category` 設成必填也是同一個理由：一張能把任務搬到另一個類別的表單必須講清楚它要落在哪裡，
+省略的話「沒有改」和「清掉」就分不出來了。
 
 ### `Problem`
 

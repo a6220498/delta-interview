@@ -8,6 +8,8 @@ import type { components } from '@/api/generated/schema'
  * detail and a future switch of generator does not touch every call site.
  */
 export type Task = components['schemas']['Task']
+// [AI assisted 003] 使用 AI 協助補上契約新增的 TaskCategory 型別重新匯出
+export type TaskCategory = components['schemas']['TaskCategory']
 export type CreateTaskRequest = components['schemas']['CreateTaskRequest']
 export type UpdateTaskRequest = components['schemas']['UpdateTaskRequest']
 export type Problem = components['schemas']['Problem']

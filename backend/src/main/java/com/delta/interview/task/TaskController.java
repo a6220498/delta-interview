@@ -40,16 +40,26 @@ public class TaskController implements TasksApi {
         return ResponseEntity.ok(tasks.findById(id));
     }
 
+    // [AI assisted 003] 使用 AI 協助把契約新增的 category / dueDate 接進 repository 呼叫
     @Override
     public ResponseEntity<Task> createTask(CreateTaskRequest createTaskRequest) {
-        Task created = tasks.create(createTaskRequest.getTitle(), createTaskRequest.getDescription());
+        Task created = tasks.create(
+                createTaskRequest.getTitle(),
+                createTaskRequest.getDescription(),
+                createTaskRequest.getCategory(),
+                createTaskRequest.getDueDate());
         return ResponseEntity.created(URI.create("/api/tasks/" + created.getId())).body(created);
     }
 
+    // [AI assisted 003] 同上；改類別的發號邏輯刻意留在 repository，controller 只轉交欄位
     @Override
     public ResponseEntity<Task> updateTask(UUID id, UpdateTaskRequest updateTaskRequest) {
-        return ResponseEntity.ok(
-                tasks.update(id, updateTaskRequest.getTitle(), updateTaskRequest.getDescription()));
+        return ResponseEntity.ok(tasks.update(
+                id,
+                updateTaskRequest.getTitle(),
+                updateTaskRequest.getDescription(),
+                updateTaskRequest.getCategory(),
+                updateTaskRequest.getDueDate()));
     }
 
     @Override

@@ -1,3 +1,4 @@
+import type { Task } from '@/types/task'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { ApiError } from './http'
@@ -13,14 +14,19 @@ function jsonResponse(status: number, body: unknown): Response {
 
 const fetchMock = vi.fn<typeof fetch>()
 
+// [AI assisted 003] 使用 AI 協助把測試替身補上 category / sequence / dueDate，並改用
+// `satisfies Task` 綁住契約 —— 契約日後再加欄位，這裡會直接型別檢查失敗而不是默默失真。
 const sampleTask = {
   id: '3f1a7c2e-9b04-4f5d-8a11-6c2d5e0f7b31',
+  category: 'feat',
+  sequence: 3,
   title: 'Write the contract',
   description: null,
   completed: false,
+  dueDate: null,
   createdAt: '2026-09-06T10:00:00Z',
   updatedAt: '2026-09-06T10:00:00Z',
-}
+} satisfies Task
 
 /** Returns the URL passed to the most recent `fetch` call. */
 function lastUrl(): string {
@@ -63,10 +69,13 @@ describe('tasks api', () => {
     it('posts the contract payload and returns the created task', async () => {
       fetchMock.mockResolvedValue(jsonResponse(201, sampleTask))
 
-      const created = await createTask({ title: 'Write the contract' })
+      const created = await createTask({ title: 'Write the contract', category: 'feat' })
 
       expect(lastInit().method).toBe('POST')
-      expect(JSON.parse(String(lastInit().body))).toEqual({ title: 'Write the contract' })
+      // The category picks the serial's counter, so it travels with the create…
+      expect(JSON.parse(String(lastInit().body))).toEqual({ title: 'Write the contract', category: 'feat' })
+      // …but the serial itself is the server's to assign and is never sent.
+      expect(JSON.parse(String(lastInit().body))).not.toHaveProperty('sequence')
       expect(created).toEqual(sampleTask)
     })
   })
@@ -75,7 +84,7 @@ describe('tasks api', () => {
     it('PUTs to the task resource', async () => {
       fetchMock.mockResolvedValue(jsonResponse(200, sampleTask))
 
-      await updateTask(sampleTask.id, { title: 'renamed' })
+      await updateTask(sampleTask.id, { title: 'renamed', category: 'feat' })
 
       expect(lastUrl()).toBe(`/api/tasks/${sampleTask.id}`)
       expect(lastInit().method).toBe('PUT')
