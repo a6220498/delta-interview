@@ -116,7 +116,7 @@ Vite 會把 `/api` proxy 到 `localhost:8080`，因此開發環境同源、後�
 | 欄位 | 契約 | Java | TypeScript | 必填 |
 |---|---|---|---|---|
 | `id` | `string($uuid)` | `UUID` | `string` | ✔（伺服器產生） |
-| `category` | `enum`：`bug` / `feat` | `TaskCategory` | `'bug' \| 'feat'` | ✔ |
+| `category` | `integer($int32)` `enum`：`0` / `1` | `TaskCategory` | `0 \| 1` | ✔ |
 | `sequence` | `integer($int32)`，≥ 1 | `Integer` | `number` | ✔（伺服器產生） |
 | `title` | `string`，1–200 字 | `String` | `string` | ✔ |
 | `description` | `string`，≤ 2000 字，nullable | `@Nullable String` | `string \| null` | — |
@@ -130,20 +130,38 @@ Vite 會把 `/api` proxy 到 `localhost:8080`，因此開發環境同源、後�
 所以前端 `TaskComposer.vue` 的 `maxlength` 是手寫的 UI 提示，實際把關的仍是後端。）
 標題長度是**驗證**而不是**顯示**：畫面不主動印「還剩幾字」，只有超出上限、驗證沒過時才跳錯誤。
 
+#### `category`：數字碼而不是名字
+
+`category` 在契約裡是一個**封閉的數字 enum**：
+
+| 值 | 類別 | 顯示前綴 | Java | TypeScript |
+|---|---|---|---|---|
+| `0` | feature | `feat` | `TaskCategory.FEATURE` | `0` |
+| `1` | bug | `bug` | `TaskCategory.BUG` | `1` |
+
+這張表只定義在 [`api/openapi.yaml`](api/openapi.yaml) 的 `TaskCategory` 一處。後端靠
+`x-enum-varnames` 拿到具名常數（`TaskCategory.FEATURE` / `BUG`），程式碼裡不會出現裸的
+`0` / `1`；前端拿到的是 `0 | 1`，名字與前綴在**畫面邊界**上查一次表換掉，其餘地方一律傳碼。
+
+封閉 enum 而不是任意整數：範圍外的碼（例如 `2`）在邊界就是 400，不會變成一張畫不出來的卡片。
+舊契約的字串寫法（`"category":"bug"`）同樣被擋掉 —— 沒跟上這次改動的客戶端會直接收到 400，
+而不是把壞資料寫進來。
+
 #### 工單編號：`category` + `sequence`
 
 畫面上的工單編號不是一個獨立欄位，而是 `category` 與 `sequence` 這一對算出來的：
 
 ```
-`${category}-${String(sequence).padStart(4, '0')}`   →   bug-0007 / feat-0003
+`${PREFIX[category]}-${String(sequence).padStart(4, '0')}`   →   bug-0007 / feat-0003
+                                                                 （PREFIX: 0 → feat、1 → bug）
 ```
 
-補零到四位數是**顯示**行為，由前端負責；契約走的是原始整數，後端不回傳格式化字串。
+前綴查表與補零到四位數都是**顯示**行為，由前端負責；契約走的是原始數字，後端不回傳格式化字串。
 
-`bug` 與 `feat` **各有一個獨立的計數器**，所以 `bug-0001` 與 `feat-0001` 會同時存在 ——
+兩個類別**各有一個獨立的計數器**，所以 `bug-0001` 與 `feat-0001` 會同時存在 ——
 唯一的是（`category`, `sequence`）這一對，不是 `sequence` 本身。
 
-因為兩個計數器獨立，**改類別時會從目標類別的計數器重新發號**：`feat-0003` 改成 `bug`
+因為兩個計數器獨立，**改類別時會從目標類別的計數器重新發號**：`feat-0003` 改成 `bug`（`1`）
 會變成例如 `bug-0007`，而不是沿用 `0003` 去跟既有的 `bug-0003` 撞號；原本的號碼直接作廢
 不回收。這件事之所以無痛，正是因為 `id` 是獨立的 uuid：換號不會動到任何網址或飛在路上的請求。
 

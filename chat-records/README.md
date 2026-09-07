@@ -9,6 +9,7 @@
 | **002** | [002-project-init.md](./002-project-init.md) | 實現 — 專案骨架 | 09-06 23:38 ~ 09-07 00:53 | monorepo、`api/openapi.yaml`、前後端骨架 |
 | **003** | [003-backend-contract-revision.md](./003-backend-contract-revision.md) | 實現 — 契約修訂 | 09-08 00:54 ~ 01:16 | `category` / `sequence` / `dueDate`；後端測試 8 → 15 |
 | **004** | [004-ui-spec-revision.md](./004-ui-spec-revision.md) | 設計 — 規格頁改版 | 09-08 01:32 ~ 02:25 | 契約欄位進 UI、表單標示重整、04 節色票落地 |
+| **005** | [005-category-numeric-code.md](./005-category-numeric-code.md) | 實現 — 契約修訂 | 09-08 02:31 ~ 02:48 | `category` 改為數字碼（`0` = feature、`1` = bug） |
 
 編號依**對話發生時間**排序，不是依檔案建立時間 —— 001 的 UIUX 設計早於 002 的專案初始化。
 004 回頭改設計（規格頁），排在 003 之後是因為它接續 003 定案的契約欄位 ——

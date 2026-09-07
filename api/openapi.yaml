@@ -200,17 +200,34 @@ components:
   schemas:
     # [AI assisted 003] 使用 AI 協助設計工單編號的契約形狀：id 維持 uuid 給機器用，
     # 人看的編號改由 category + sequence 這一對組成（兩類別各自計數），並新增 dueDate。
+    # [AI assisted 005] category 由字串 enum 改成數字碼（0 = feature、1 = bug）。
+    # 兩端的具名常數（Java `TaskCategory.FEATURE` / TS `0 | 1`）與顯示前綴的對照表
+    # 都收在本 schema 的 description，避免數字碼散落在各處變成無註解的魔術數字。
     TaskCategory:
-      type: string
+      type: integer
+      format: int32
       description: |
         工單類別 — the kind of work a task represents.
 
-        Drives the display number's prefix, the card's colour and the board's
-        grouping. Deliberately a closed enum rather than free text: the two
-        values are a fixed part of the domain, and an enum makes an unknown
-        value a 400 at the boundary instead of an unrenderable card.
-      enum: [bug, feat]
-      example: bug
+        A numeric code rather than a name:
+
+          | value | category  | display prefix |
+          | ----- | --------- | -------------- |
+          | `0`   | `feature` | `feat`         |
+          | `1`   | `bug`     | `bug`          |
+
+        Drives the display number's prefix, the card's shape and the board's
+        grouping. Deliberately a closed enum rather than a plain integer: the two
+        values are a fixed part of the domain, and an enum makes an unknown code
+        a 400 at the boundary instead of an unrenderable card.
+
+        This table is the only place the codes are named, so neither side hand-
+        writes a bare `0` or `1`: the backend gets `TaskCategory.FEATURE` /
+        `TaskCategory.BUG` from `x-enum-varnames`, and the frontend maps the
+        code to a label and prefix in one lookup at the render boundary.
+      enum: [0, 1]
+      x-enum-varnames: [FEATURE, BUG]
+      example: 1
 
     Task:
       type: object
@@ -220,8 +237,9 @@ components:
         Two identifiers, on purpose. `id` is the machine one — routes, requests,
         cache keys — and never changes. The number a human reads off the card is
         the pair (`category`, `sequence`), rendered client-side as `bug-0007` /
-        `feat-0003`. Splitting them means the human-readable number can follow a
-        task's category without ever breaking a URL.
+        `feat-0003` — the category's code picks the prefix, the serial is padded
+        to four digits. Splitting them means the human-readable number can
+        follow a task's category without ever breaking a URL.
       required: [id, category, sequence, title, completed, createdAt, updatedAt]
       properties:
         id:
@@ -236,9 +254,9 @@ components:
           minimum: 1
           description: |
             Per-category serial, assigned by the server and never accepted from
-            a client. `bug` and `feat` count independently, so a `bug-0001` and
-            a `feat-0001` both exist: it is the pair (`category`, `sequence`)
-            that is unique, not `sequence` on its own.
+            a client. The two categories count independently, so a `bug-0001`
+            and a `feat-0001` both exist: it is the pair (`category`,
+            `sequence`) that is unique, not `sequence` on its own.
 
             Sent as a plain integer; zero-padding to four digits is a
             presentation concern and belongs to the client.

@@ -16,9 +16,11 @@ const fetchMock = vi.fn<typeof fetch>()
 
 // [AI assisted 003] 使用 AI 協助把測試替身補上 category / sequence / dueDate，並改用
 // `satisfies Task` 綁住契約 —— 契約日後再加欄位，這裡會直接型別檢查失敗而不是默默失真。
+// [AI assisted 005] category 改成數字碼後，`satisfies Task` 正是抓出這幾處替身要改的地方。
 const sampleTask = {
   id: '3f1a7c2e-9b04-4f5d-8a11-6c2d5e0f7b31',
-  category: 'feat',
+  // 0 = feature，1 = bug；對照表在 api/openapi.yaml 的 TaskCategory。
+  category: 0,
   sequence: 3,
   title: 'Write the contract',
   description: null,
@@ -69,11 +71,11 @@ describe('tasks api', () => {
     it('posts the contract payload and returns the created task', async () => {
       fetchMock.mockResolvedValue(jsonResponse(201, sampleTask))
 
-      const created = await createTask({ title: 'Write the contract', category: 'feat' })
+      const created = await createTask({ title: 'Write the contract', category: 0 })
 
       expect(lastInit().method).toBe('POST')
       // The category picks the serial's counter, so it travels with the create…
-      expect(JSON.parse(String(lastInit().body))).toEqual({ title: 'Write the contract', category: 'feat' })
+      expect(JSON.parse(String(lastInit().body))).toEqual({ title: 'Write the contract', category: 0 })
       // …but the serial itself is the server's to assign and is never sent.
       expect(JSON.parse(String(lastInit().body))).not.toHaveProperty('sequence')
       expect(created).toEqual(sampleTask)
@@ -84,7 +86,7 @@ describe('tasks api', () => {
     it('PUTs to the task resource', async () => {
       fetchMock.mockResolvedValue(jsonResponse(200, sampleTask))
 
-      await updateTask(sampleTask.id, { title: 'renamed', category: 'feat' })
+      await updateTask(sampleTask.id, { title: 'renamed', category: 0 })
 
       expect(lastUrl()).toBe(`/api/tasks/${sampleTask.id}`)
       expect(lastInit().method).toBe('PUT')

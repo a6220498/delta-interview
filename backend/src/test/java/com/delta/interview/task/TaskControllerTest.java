@@ -57,10 +57,10 @@ class TaskControllerTest {
         return objectMapper.readTree(body);
     }
 
-    /** Creates a `feat` task with the given title and returns its id. */
+    /** Creates a feature task (`category` 0) with the given title and returns its id. */
     private UUID createTask(String title) throws Exception {
         return UUID.fromString(
-                create("{\"title\":\"" + title + "\",\"category\":\"feat\"}")
+                create("{\"title\":\"" + title + "\",\"category\":0}")
                         .get("id")
                         .asText());
     }
@@ -74,13 +74,13 @@ class TaskControllerTest {
         void createsIncompleteTask() throws Exception {
             mockMvc.perform(post("/api/tasks")
                             .contentType(MediaType.APPLICATION_JSON)
-                            .content("{\"title\":\"Write tests\",\"category\":\"feat\","
+                            .content("{\"title\":\"Write tests\",\"category\":0,"
                                     + "\"description\":\"Cover the contract\"}"))
                     .andExpect(status().isCreated())
                     .andExpect(jsonPath("$.id").exists())
                     .andExpect(jsonPath("$.title", is("Write tests")))
                     .andExpect(jsonPath("$.description", is("Cover the contract")))
-                    .andExpect(jsonPath("$.category", is("feat")))
+                    .andExpect(jsonPath("$.category", is(0)))
                     // The serial is server-assigned like the id: the payload carries no
                     // sequence, so a client cannot mint a number someone already holds.
                     .andExpect(jsonPath("$.sequence").exists())
@@ -94,7 +94,7 @@ class TaskControllerTest {
         void rejectsBlankTitle() throws Exception {
             mockMvc.perform(post("/api/tasks")
                             .contentType(MediaType.APPLICATION_JSON)
-                            .content("{\"title\":\"\",\"category\":\"feat\"}"))
+                            .content("{\"title\":\"\",\"category\":0}"))
                     .andExpect(status().isBadRequest());
         }
 
@@ -109,28 +109,36 @@ class TaskControllerTest {
                     .andExpect(status().isBadRequest());
         }
 
+        // [AI assisted 005] category 改成數字碼之後，這個測試鎖住兩件事：範圍外的碼要被擋掉，
+        // 以及舊契約的字串類別名不會被靜默接受 —— 沒跟上這次改動的客戶端會在邊界收到 400，
+        // 而不是把壞資料寫進來。
         @Test
         @DisplayName("rejects a category outside the enum rather than storing an unrenderable value")
         void rejectsUnknownCategory() throws Exception {
             mockMvc.perform(post("/api/tasks")
                             .contentType(MediaType.APPLICATION_JSON)
-                            .content("{\"title\":\"a chore\",\"category\":\"chore\"}"))
+                            .content("{\"title\":\"a chore\",\"category\":2}"))
+                    .andExpect(status().isBadRequest());
+
+            mockMvc.perform(post("/api/tasks")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"title\":\"a bug\",\"category\":\"bug\"}"))
                     .andExpect(status().isBadRequest());
         }
 
         @Test
         @DisplayName("draws the serial from the task's own category counter, not a shared one")
         void serialsAreCountedPerCategory() throws Exception {
-            int firstBug = create("{\"title\":\"bug one\",\"category\":\"bug\"}")
+            int firstBug = create("{\"title\":\"bug one\",\"category\":1}")
                     .get("sequence")
                     .asInt();
 
             // Numbering the feat run must leave no gap in the bug run: this is the
             // whole difference between two counters and one shared counter.
-            create("{\"title\":\"feat one\",\"category\":\"feat\"}");
-            create("{\"title\":\"feat two\",\"category\":\"feat\"}");
+            create("{\"title\":\"feat one\",\"category\":0}");
+            create("{\"title\":\"feat two\",\"category\":0}");
 
-            int secondBug = create("{\"title\":\"bug two\",\"category\":\"bug\"}")
+            int secondBug = create("{\"title\":\"bug two\",\"category\":1}")
                     .get("sequence")
                     .asInt();
 
@@ -142,7 +150,7 @@ class TaskControllerTest {
         void storesDueDate() throws Exception {
             mockMvc.perform(post("/api/tasks")
                             .contentType(MediaType.APPLICATION_JSON)
-                            .content("{\"title\":\"ship it\",\"category\":\"feat\",\"dueDate\":\"2026-09-30\"}"))
+                            .content("{\"title\":\"ship it\",\"category\":0,\"dueDate\":\"2026-09-30\"}"))
                     .andExpect(status().isCreated())
                     .andExpect(jsonPath("$.dueDate", is("2026-09-30")));
         }
@@ -194,7 +202,7 @@ class TaskControllerTest {
             // an edit form must never silently reopen a finished task.
             mockMvc.perform(put("/api/tasks/{id}", id)
                             .contentType(MediaType.APPLICATION_JSON)
-                            .content("{\"title\":\"renamed\",\"category\":\"feat\"}"))
+                            .content("{\"title\":\"renamed\",\"category\":0}"))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.title", is("renamed")))
                     .andExpect(jsonPath("$.completed", is(true)));
@@ -206,20 +214,20 @@ class TaskControllerTest {
         @DisplayName("moving to the other category re-issues the serial there, keeping the id")
         void movingCategoryReissuesTheSerial() throws Exception {
             UUID misfiled = UUID.fromString(
-                    create("{\"title\":\"misfiled\",\"category\":\"feat\"}")
+                    create("{\"title\":\"misfiled\",\"category\":0}")
                             .get("id")
                             .asText());
-            int latestBug = create("{\"title\":\"a real bug\",\"category\":\"bug\"}")
+            int latestBug = create("{\"title\":\"a real bug\",\"category\":1}")
                     .get("sequence")
                     .asInt();
 
             mockMvc.perform(put("/api/tasks/{id}", misfiled)
                             .contentType(MediaType.APPLICATION_JSON)
-                            .content("{\"title\":\"misfiled\",\"category\":\"bug\"}"))
+                            .content("{\"title\":\"misfiled\",\"category\":1}"))
                     .andExpect(status().isOk())
                     // URLs and in-flight requests hold the id, so a move must not touch it…
                     .andExpect(jsonPath("$.id", is(misfiled.toString())))
-                    .andExpect(jsonPath("$.category", is("bug")))
+                    .andExpect(jsonPath("$.category", is(1)))
                     // …while the displayed number follows the category, drawn fresh from the
                     // destination counter so it cannot collide with the bug already holding
                     // the serial this task arrived with.
@@ -229,12 +237,12 @@ class TaskControllerTest {
         @Test
         @DisplayName("saving without changing the category keeps the serial the user already knows")
         void sameCategoryKeepsTheSerial() throws Exception {
-            JsonNode created = create("{\"title\":\"stable\",\"category\":\"bug\"}");
+            JsonNode created = create("{\"title\":\"stable\",\"category\":1}");
             UUID id = UUID.fromString(created.get("id").asText());
 
             mockMvc.perform(put("/api/tasks/{id}", id)
                             .contentType(MediaType.APPLICATION_JSON)
-                            .content("{\"title\":\"still stable\",\"category\":\"bug\"}"))
+                            .content("{\"title\":\"still stable\",\"category\":1}"))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.sequence", is(created.get("sequence").asInt())));
         }
@@ -242,13 +250,13 @@ class TaskControllerTest {
         @Test
         @DisplayName("is a full replace, so omitting description and dueDate clears them")
         void omittedFieldsAreCleared() throws Exception {
-            JsonNode created = create("{\"title\":\"full\",\"category\":\"feat\","
+            JsonNode created = create("{\"title\":\"full\",\"category\":0,"
                     + "\"description\":\"detail\",\"dueDate\":\"2026-09-30\"}");
             UUID id = UUID.fromString(created.get("id").asText());
 
             mockMvc.perform(put("/api/tasks/{id}", id)
                             .contentType(MediaType.APPLICATION_JSON)
-                            .content("{\"title\":\"full\",\"category\":\"feat\"}"))
+                            .content("{\"title\":\"full\",\"category\":0}"))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.description").doesNotExist())
                     .andExpect(jsonPath("$.dueDate").doesNotExist());
