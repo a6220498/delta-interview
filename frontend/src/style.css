@@ -2,42 +2,65 @@
 
 /*
  * Tailwind 4 has no tailwind.config.js — the design tokens live here.
- * Utilities such as `bg-surface`, `text-muted`, `border-line` and
- * `bg-danger/10` are generated from these custom properties.
+ *
+ * This palette is `docs/ui-spec.html` 節 04 verbatim: the paper-docket theme
+ * the whole UI spec is drawn in. Utilities such as `bg-stock`, `text-ink-3`,
+ * `border-rule` and `bg-alert/10` are generated from these custom properties.
+ *
+ * Single theme, on purpose — the spec specifies one palette and nothing else.
+ * Every contrast figure below is measured against `--color-stock`, and all of
+ * them clear WCAG AA.
+ *
+ * [AI assisted 004] 使用 AI 協助把 docs/ui-spec.html 節 04 的色票搬進 Tailwind。
+ * `static` 這個關鍵字是 AI 在檢查 build 產出時發現要加的：第一次 build 出來只剩
+ * --color-desk 與 --font-display 兩個變數，其餘 14 個被 tree-shake 掉了。
+ *
+ * `static` because a plain `@theme` only emits the variables some generated
+ * utility happens to reference. The spec is written in raw `var(--color-…)`
+ * terms, so a component reaching for one directly in a `<style>` block would
+ * otherwise resolve it to nothing — a silent failure, not a build error.
  */
-@theme {
-  --color-canvas: #f6f7f9;
-  --color-surface: #ffffff;
-  --color-line: #e3e6ea;
-  --color-ink: #17191c;
-  --color-muted: #5f6672;
-  --color-accent: #2f6df6;
-  --color-accent-ink: #ffffff;
-  --color-success: #16794c;
-  --color-danger: #c02626;
+@theme static {
+  --color-desk: #bfbcb1; /* 工作檯 */
+  --color-tray: #b2aea2; /* 凹陷托盤 */
+  --color-tray-edge: #9e9a8e; /* 托盤邊緣、空架虛線 */
+  --color-stock: #f0eee7; /* 單據紙 */
+  --color-stock-2: #e3e0d6; /* 第二聯／已歸檔 */
+  --color-stub: #e7e4da; /* 存根 */
+  --color-rule: #c8c3b6; /* 表格線 */
+  --color-rule-2: #d8d4c9; /* 次級表格線、說明欄格線 */
+  --color-ink: #1f1c18;
+  --color-ink-2: #4a453d;
+  --color-ink-3: #6e685d; /* 4.76:1 */
+  --color-stamp: #5b3fa8; /* 6.64:1 完成章印油 */
+  --color-stamp-bg: #eae5f5;
+  --color-alert: #b5321f; /* 5.26:1 逾期 */
+  --color-alert-2: #8f2718; /* 7.32:1 刪除鈕 hover */
+  --color-alert-bg: #f3ded9;
 
-  --radius-panel: 0.75rem;
+  --font-display: 'Barlow Semi Condensed', 'Noto Sans TC', ui-sans-serif, sans-serif;
+  --font-sans: 'Barlow', 'Noto Sans TC', ui-sans-serif, system-ui, sans-serif;
+  --font-mono: 'Courier Prime', 'Noto Sans TC', ui-monospace, monospace;
+
+  /*
+   * 全站唯一圓角。This deliberately redefines Tailwind's own `--radius-sm`
+   * rather than adding a name of its own, so `rounded-sm` means the spec's
+   * 2px everywhere instead of quietly meaning Tailwind's 0.25rem.
+   */
+  --radius-sm: 2px;
 }
 
 /*
- * Dark mode redefines the same tokens rather than adding `dark:` variants, so
- * templates stay free of theme branching — every utility above follows along.
+ * `color-scheme: light` pins the browser's own chrome — date pickers, selects,
+ * scrollbars, `::backdrop` — to the light rendering. A token override alone
+ * does not reach any of those.
  */
-@media (prefers-color-scheme: dark) {
-  :root {
-    --color-canvas: #101319;
-    --color-surface: #171b23;
-    --color-line: #2a313d;
-    --color-ink: #eef1f6;
-    --color-muted: #9aa3b2;
-    --color-accent: #6f9bff;
-    --color-accent-ink: #0b0e14;
-    --color-success: #4ec08a;
-    --color-danger: #f2706b;
-  }
+:root {
+  color-scheme: light;
 }
 
 body {
-  background-color: var(--color-canvas);
+  background-color: var(--color-desk);
   color: var(--color-ink);
+  font-family: var(--font-sans);
 }

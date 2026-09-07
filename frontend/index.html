@@ -5,6 +5,20 @@
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Delta Task</title>
+    <!--
+      [AI assisted 004] 由 AI 補上：換色票時發現 --font-* 指向的四個字型從來沒有
+      被載入過，token 存在但解析不到字型檔。
+
+      The four faces `docs/ui-spec.html` 節 04 names in --font-display / --font-sans
+      / --font-mono. Loaded here rather than @import-ed from CSS so the requests
+      start with the HTML parse instead of waiting on the stylesheet.
+    -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@400;500;600;700&family=Barlow:wght@400;500;600&family=Courier+Prime:wght@400;700&family=Noto+Sans+TC:wght@400;500;700;900&display=swap"
+    />
   </head>
   <body>
     <div id="app"></div>
