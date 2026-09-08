@@ -1,4 +1,5 @@
-import type { Task, TaskRack } from '@/types/task'
+import type { TaskRack } from '@/const/task'
+import type { Task } from '@/types/task'
 
 /**
  * Inputs for one shelf of the board.
@@ -8,7 +9,13 @@ import type { Task, TaskRack } from '@/types/task'
  * per mounted tray — is how a task ends up on both shelves or on neither.
  */
 export interface TaskListProps {
-  /** Which shelf this is; picks the name, the tally colour and the empty text. */
+  /**
+   * The shelf this tray is: its name, its tally colour, its empty text and the
+   * completion state it holds.
+   *
+   * The row itself rather than an id to look up, so the tray needs no copy of
+   * the board's table and the two cannot disagree about what a shelf is called.
+   */
   rack: TaskRack
   /** The tasks to stack, already selected for this rack by the caller. */
   tasks: Task[]

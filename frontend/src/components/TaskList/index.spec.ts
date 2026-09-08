@@ -1,3 +1,5 @@
+import { TASK_RACKS } from '@/const/task'
+import type { TaskRack } from '@/const/task'
 import type { Task } from '@/types/task'
 import { mount } from '@vue/test-utils'
 import { describe, expect, it } from 'vitest'
@@ -26,9 +28,26 @@ const readme = task({ id: 'b', sequence: 2 })
 const skeleton = task({ id: 'c', sequence: 3 })
 const three = [cors, readme, skeleton]
 
+/**
+ * The rack filed under `id`, taken from the table the board itself hangs.
+ *
+ * Looked up rather than written out here: the tray draws whatever row it is
+ * handed, so a fixture row would let the tray and the real table drift while
+ * these tests went on passing.
+ */
+function rack(id: string): TaskRack {
+  const row = TASK_RACKS.find((candidate) => candidate.id === id)
+
+  if (!row) {
+    throw new Error(`no rack is filed under ${id}`)
+  }
+
+  return row
+}
+
 /** Mounts an in-tray holding `tasks`. */
 function mountList(tasks: Task[]) {
-  return mount(TaskList, { props: { rack: 'open', tasks } })
+  return mount(TaskList, { props: { rack: rack('open'), tasks } })
 }
 
 /**
@@ -53,14 +72,14 @@ describe('TaskList', () => {
     it.each([
       ['open', '未完成'],
       ['done', '已完成'],
-    ] as const)('names the %s rack 「%s」 in a level-3 heading', (rack, expected) => {
-      const wrapper = mount(TaskList, { props: { rack, tasks: [] } })
+    ] as const)('names the %s rack 「%s」 in a level-3 heading', (id, expected) => {
+      const wrapper = mount(TaskList, { props: { rack: rack(id), tasks: [] } })
 
       expect(wrapper.get('h3').text()).toBe(expected)
     })
 
     it('tallies what is actually on the shelf', () => {
-      const wrapper = mount(TaskList, { props: { rack: 'open', tasks: three } })
+      const wrapper = mount(TaskList, { props: { rack: rack('open'), tasks: three } })
 
       expect(wrapper.get('[data-tally]').text()).toBe('3')
     })
@@ -68,7 +87,7 @@ describe('TaskList', () => {
     it('keeps the English tray stamp out of the accessibility tree', () => {
       // "In Tray" is lettering pressed into a physical tray, not a second name
       // for the rack; announcing it would repeat 未完成 in another language.
-      const wrapper = mount(TaskList, { props: { rack: 'open', tasks: [] } })
+      const wrapper = mount(TaskList, { props: { rack: rack('open'), tasks: [] } })
 
       expect(wrapper.get('[data-hint]').attributes('aria-hidden')).toBe('true')
     })
@@ -76,7 +95,7 @@ describe('TaskList', () => {
 
   describe('stack', () => {
     it('renders one card per task', () => {
-      const wrapper = mount(TaskList, { props: { rack: 'open', tasks: three } })
+      const wrapper = mount(TaskList, { props: { rack: rack('open'), tasks: three } })
 
       expect(wrapper.findAllComponents(Card)).toHaveLength(3)
     })
@@ -84,7 +103,7 @@ describe('TaskList', () => {
     it('announces the stack as a list, so its length is known before reading it', () => {
       // Preflight strips list markers, and some browsers drop list semantics
       // along with them; the explicit role puts the item count back.
-      const wrapper = mount(TaskList, { props: { rack: 'open', tasks: three } })
+      const wrapper = mount(TaskList, { props: { rack: rack('open'), tasks: three } })
 
       expect(wrapper.get('ul').attributes('role')).toBe('list')
     })
@@ -94,14 +113,14 @@ describe('TaskList', () => {
     it.each([
       ['open', '架上沒有單子 —— 按「新增工單」開一張'],
       ['done', '還沒有蓋章的單子'],
-    ] as const)('points the %s rack at its own next action', (rack, expected) => {
-      const wrapper = mount(TaskList, { props: { rack, tasks: [] } })
+    ] as const)('points the %s rack at its own next action', (id, expected) => {
+      const wrapper = mount(TaskList, { props: { rack: rack(id), tasks: [] } })
 
       expect(wrapper.text()).toContain(expected)
     })
 
     it('drops the empty notice as soon as there is something on the shelf', () => {
-      const wrapper = mount(TaskList, { props: { rack: 'open', tasks: three } })
+      const wrapper = mount(TaskList, { props: { rack: rack('open'), tasks: three } })
 
       expect(wrapper.text()).not.toContain('架上沒有單子')
     })

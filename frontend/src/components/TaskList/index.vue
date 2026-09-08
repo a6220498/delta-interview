@@ -4,18 +4,18 @@
  * completion state, with the rack's name, a tally of what is on it and the
  * pressed lettering a physical in/out tray carries.
  *
- * Deliberately one component used twice rather than a component per rack. The
- * two trays are the same object in every respect but four words and a colour,
- * so a pair of near-identical files would drift the moment one of them is
- * touched; `rack` is what makes this one an in-tray or an out-tray. It also
- * means the call site cannot build an 未完成 tray wearing the done colours.
+ * Deliberately one component rendered once per rack rather than a component
+ * per rack. The two trays are the same object in every respect but four words
+ * and a colour, so a pair of near-identical files would drift the moment one of
+ * them is touched. Everything that differs arrives in `rack`, one row of the
+ * board's table — the tray draws that row and holds no table of its own, so it
+ * cannot disagree with the board about what a shelf is called.
  *
  * The tray takes its tasks as a prop and does no filtering: which tasks belong
  * on which shelf is one decision, and making it twice — once per instance —
  * is how a task ends up on both shelves or on neither.
  */
 import Card from './Card.vue'
-import { RACKS } from './const'
 import type { TaskListEmits, TaskListProps } from './types'
 
 const props = defineProps<TaskListProps>()
@@ -33,7 +33,7 @@ const emit = defineEmits<TaskListEmits>()
     <div class="flex items-center gap-2 px-1 pt-0.5 pb-2.5">
       <!-- Preflight strips a heading's own size and weight, so both are stated. -->
       <h3 class="font-display text-[15px] font-semibold tracking-[0.1em] uppercase">
-        {{ RACKS[props.rack].heading }}
+        {{ props.rack.title }}
       </h3>
 
       <!--
@@ -43,7 +43,7 @@ const emit = defineEmits<TaskListEmits>()
       <span
         data-tally
         class="min-w-[26px] rounded-sm px-1.5 pt-[5px] pb-1.5 text-center text-[15px] leading-none font-bold tabular-nums text-stock"
-        :class="RACKS[props.rack].tally"
+        :class="props.rack.tally"
       >
         {{ props.tasks.length }}
       </span>
@@ -57,7 +57,7 @@ const emit = defineEmits<TaskListEmits>()
         aria-hidden="true"
         class="ml-auto border-b border-ink pb-px font-display text-[11.5px] font-semibold tracking-[0.18em] uppercase"
       >
-        {{ RACKS[props.rack].hint }}
+        {{ props.rack.hint }}
       </span>
     </div>
 
@@ -69,7 +69,7 @@ const emit = defineEmits<TaskListEmits>()
       v-if="props.tasks.length === 0"
       class="rounded-sm border border-dashed border-tray-edge px-2 py-[22px] text-center font-mono text-[11.5px] tracking-[0.06em] text-ink-2"
     >
-      {{ RACKS[props.rack].empty }}
+      {{ props.rack.empty }}
     </p>
 
     <!--
