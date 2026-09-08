@@ -10,10 +10,9 @@
  */
 export type {
   CategoryOption,
-  TaskDialogCreateProps,
-  TaskDialogEditProps,
   TaskDialogEmits,
+  TaskDialogExposed,
   TaskDialogMode,
-  TaskDialogProps,
+  TaskDialogOpen,
   TaskDialogValues,
 } from './task-dialog'

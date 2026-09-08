@@ -7,20 +7,22 @@
  * four words — the number in the corner and the heading beside it — while the
  * fields, their limits, their validation and the 取消／確定 pair are identical;
  * a second component would be a copy of this one that drifts the first time a
- * field is added to only one of them. `mode` carries the difference, and in edit
- * mode the task it was opened on carries the values the fields open with.
+ * field is added to only one of them. `open()` carries the difference, and in
+ * edit mode the task it is handed carries the values the fields open with.
  *
  * A native `<dialog>` opened with `showModal()`, not a floating div: focus stays
  * inside the sheet, Esc closes it, and focus returns to the control that opened
  * it — all things the browser already does correctly and a hand-built modal has
  * to earn back one keyboard interaction at a time.
  *
- * The sheet renders a form and reports what was typed. It neither saves nor
- * closes itself: see `submit` in `./types`.
+ * Opened and closed by calling it rather than by a prop, because the browser
+ * closes it too and a fact with two owners goes out of step: see
+ * `TaskDialogExposed` in `./types`. What the sheet does *not* decide is what
+ * becomes of what was typed — it reports that and waits: see `submit`.
  */
-import { computed, onMounted, ref, useId, useTemplateRef, watch } from 'vue'
+import { computed, nextTick, ref, shallowRef, useId, useTemplateRef } from 'vue'
 
-import type { TaskCategory } from '@/types/task'
+import type { Task, TaskCategory } from '@/types/task'
 import { categoryDisplay, displayNumber } from '@/utils/task'
 
 import {
@@ -31,9 +33,7 @@ import {
   MESSAGES,
   NEW_NUMBER,
 } from './const'
-import type { TaskDialogEmits, TaskDialogProps } from './types'
-
-const props = defineProps<TaskDialogProps>()
+import type { TaskDialogEmits, TaskDialogExposed, TaskDialogMode, TaskDialogOpen } from './types'
 
 const emit = defineEmits<TaskDialogEmits>()
 
@@ -50,16 +50,26 @@ const uid = useId()
 const sheet = useTemplateRef<HTMLDialogElement>('sheet')
 const titleInput = useTemplateRef<HTMLInputElement>('titleInput')
 
+/** Which of the two jobs this sheet is currently doing. */
+const mode = ref<TaskDialogMode>('create')
+
+/**
+ * The task the sheet was opened on, or `null` while it is a blank one.
+ *
+ * `shallowRef` because the sheet holds a task, it does not own one: it takes
+ * the values out once, as it opens, and never writes a field back through it —
+ * and a deep ref would make the board's task into a reactive copy of itself the
+ * moment it was handed over.
+ */
+const source = shallowRef<Task | null>(null)
+
 const title = ref('')
 const category = ref<TaskCategory>(DEFAULT_CATEGORY)
 const description = ref('')
 const dueDate = ref('')
 const titleError = ref('')
 
-/** The task the sheet was opened on, or `null` when it is a blank one. */
-const source = computed(() => (props.mode === 'edit' ? props.task : null))
-
-const heading = computed(() => HEADINGS[props.mode])
+const heading = computed(() => HEADINGS[mode.value])
 
 /** The number in the corner: the task's own, or `NEW` while it has none. */
 const number = computed(() => (source.value ? displayNumber(source.value) : NEW_NUMBER))
@@ -95,54 +105,54 @@ function seed(): void {
 }
 
 /**
- * Brings the native dialog into line with `open`, seeding the fields each time
- * it opens.
+ * Puts the sheet on the desk, on a task or on nothing.
  *
- * Seeded on opening rather than whenever `task` changes: the caller updates the
- * task it holds as soon as a save lands, and re-seeding on that would wipe out
- * whatever the person had typed since.
+ * The values are read here, as the sheet opens, and not again: the owner
+ * updates the task it holds as soon as a save lands, and re-reading on that
+ * would wipe out whatever had been typed since.
+ *
+ * @param nextMode - Which job the sheet is opening for.
+ * @param task - The task to correct; only ever passed in edit mode, which the
+ *   overload in `./types` is what actually enforces.
  */
-function sync(): void {
+const open: TaskDialogOpen = (nextMode: TaskDialogMode, task?: Task): void => {
+  mode.value = nextMode
+  source.value = task ?? null
+  seed()
+
   const element = sheet.value
 
   if (!element) {
     return
   }
 
-  if (props.open) {
-    seed()
+  // Guarded rather than called flat: `showModal()` on a dialog that is already
+  // open throws, and moving an open sheet onto another task is allowed.
+  if (!element.open) {
     element.showModal()
-    // The spec's own behaviour: the caret starts in 標題, and an edit sheet
-    // selects what is there so the old title can be replaced by typing over it.
+  }
+
+  // Deferred to after the fields have been written. The spec's own behaviour is
+  // that the caret starts in 標題 with the old title selected, so it can be
+  // replaced by typing over it — and run now, `select()` would take the title
+  // the box held a render ago, or nothing at all on a sheet opening for the
+  // first time.
+  void nextTick(() => {
     titleInput.value?.focus()
     titleInput.value?.select()
-  } else if (element.open) {
+  })
+}
+
+/** Takes the sheet away; a no-op if it is already down. */
+function close(): void {
+  const element = sheet.value
+
+  if (element?.open) {
     element.close()
   }
 }
 
-// Also run once here, not only from `sync()`: a sheet mounted already open
-// would otherwise draw its fields empty and fill them a tick later, which is a
-// visible flash of a blank form over the task being edited.
-seed()
-
-onMounted(sync)
-
-watch(() => props.open, sync)
-
-/**
- * Reports a dismissal the browser carried out — Esc, or the dialog closing on
- * its own.
- *
- * Guarded on `open`, because closing the dialog in `sync()` fires this event
- * too: without the guard, a caller-driven close would come straight back as a
- * `close` the caller did not ask for.
- */
-function onDialogClose(): void {
-  if (props.open) {
-    emit('close')
-  }
-}
+defineExpose<TaskDialogExposed>({ open, close })
 
 /**
  * Validates the one required field and hands the values up.
@@ -187,7 +197,7 @@ function onSubmit(): void {
     ref="sheet"
     :aria-labelledby="`${uid}-heading`"
     class="m-auto w-[min(430px,calc(100vw-32px))] rounded-sm border border-t-[3px] border-rule border-t-ink bg-stock p-0 text-ink shadow-[0_14px_38px_rgba(31,28,24,0.34)] backdrop:bg-[rgba(31,28,24,0.44)]"
-    @close="onDialogClose"
+    @close="emit('close')"
   >
     <!-- Baseline alignment sits the small number on the heading's own line. -->
     <div
@@ -396,7 +406,7 @@ function onSubmit(): void {
         <button
           type="button"
           class="min-h-10 cursor-pointer appearance-none rounded-sm border border-rule bg-transparent px-4 font-display text-[14.5px] font-semibold tracking-[0.04em] text-ink-2 hover:border-ink-2 hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-stamp"
-          @click="emit('close')"
+          @click="close"
         >
           取消
         </button>

@@ -5,55 +5,56 @@ import type { CreateTaskRequest, Task, TaskCategory, UpdateTaskRequest } from '@
  *
  * Named states rather than an `isEdit` boolean: a boolean names one mode and
  * leaves the other as "not that one", which reads backwards at the call site
- * (`:is-edit="false"` to open a blank sheet) and has nowhere to grow if a third
- * mode ever appears.
+ * (`open(false)` to open a blank sheet) and has nowhere to grow if a third mode
+ * ever appears.
  */
 export type TaskDialogMode = 'create' | 'edit'
 
-/** What both modes take. */
-interface TaskDialogBaseProps {
+/**
+ * Putting the sheet on the desk.
+ *
+ * Two signatures rather than one with an optional task, so a mode and the task
+ * it needs travel together: `open('edit', …)` cannot be called without one, and
+ * `open('create')` cannot be handed one. That pairing is the whole reason this
+ * is typed as an overload — checked where the sheet is opened, it costs the
+ * sheet no runtime guard and cannot be got wrong at all.
+ *
+ * Calling it on a sheet that is already open is legitimate: it re-reads the
+ * fields from what it is handed, so the same sheet can be moved onto another
+ * task without being closed first.
+ */
+export interface TaskDialogOpen {
+  /** Opens a blank sheet. There is no task yet, so there is nothing to carry in. */
+  (mode: 'create'): void
   /**
-   * Whether the sheet is on the desk.
+   * Opens the sheet on a filed task, with its stored values in the fields.
    *
-   * Driven from outside rather than held in here, so the screen that owns the
-   * board owns when a sheet is open — and the sheet stays mounted while closed,
-   * which is what lets the browser hand focus back to the button that opened it.
+   * @param task - The task being corrected; its current values are what the
+   *   fields open on.
    */
-  open: boolean
-}
-
-/** Opening a blank sheet. There is no task yet, so there is nothing to carry in. */
-export interface TaskDialogCreateProps extends TaskDialogBaseProps {
-  mode: 'create'
-  /**
-   * Never set in this mode.
-   *
-   * Spelled out rather than omitted so that handing a task to a blank sheet is
-   * a type error at the call site instead of a value the sheet quietly ignores.
-   */
-  task?: never
-}
-
-/** Reopening a filed sheet, with the task it was filed from. */
-export interface TaskDialogEditProps extends TaskDialogBaseProps {
-  mode: 'edit'
-  /**
-   * The task being corrected; its current values are what the fields open on.
-   *
-   * Required by the type rather than checked at runtime: an edit sheet with
-   * nothing to edit would draw as a blank one and silently open a second task.
-   */
-  task: Task
+  (mode: 'edit', task: Task): void
 }
 
 /**
- * Inputs for the sheet.
+ * What the sheet hands to whoever holds it.
  *
- * A union rather than one shape with an optional task, so the two modes cannot
- * be mixed: `mode` decides which member applies, and the task comes with the
- * mode that needs it.
+ * The sheet owns whether it is open, and this is how that is asked for. It is
+ * deliberately not a `v-model:open` or an `open` prop: a dialog opened by a
+ * prop and closed by the browser — Esc, the backdrop — has two owners for one
+ * fact, and they go out of step the first time the browser wins. Here the
+ * question "is the sheet up?" has exactly one answer, and it is the `<dialog>`
+ * element's own.
  */
-export type TaskDialogProps = TaskDialogCreateProps | TaskDialogEditProps
+export interface TaskDialogExposed {
+  open: TaskDialogOpen
+  /**
+   * Takes the sheet away.
+   *
+   * A no-op on a sheet that is already down, so the owner can call it after a
+   * save without first checking what the person did while it was in flight.
+   */
+  close: () => void
+}
 
 /**
  * What the sheet hands back when it is submitted.
@@ -83,15 +84,17 @@ export interface TaskDialogEmits {
    *
    * The sheet does not close itself on submit. Saving can fail — a 400 from the
    * contract's validation, a dropped connection — and a sheet that has already
-   * closed has thrown away everything the person typed. Closing is the caller's
-   * to do once the write has landed.
+   * closed has thrown away everything the person typed. Closing is the owner's
+   * to do, with `close()`, once the write has landed.
    */
   submit: [values: TaskDialogValues]
   /**
-   * The sheet was dismissed: 取消, Esc, or the browser closing the dialog.
+   * The sheet went down: 取消, Esc, or `close()`.
    *
-   * Reported rather than acted on, because `open` belongs to the caller — the
-   * sheet closing itself would put the two out of step.
+   * Reported for whoever wants to know, not asked of anyone — the sheet is
+   * already closed by the time this fires, so nothing has to act on it. Every
+   * dismissal comes out here, including the owner's own `close()`, because the
+   * alternative is a hidden flag deciding which closes are worth mentioning.
    */
   close: []
 }
