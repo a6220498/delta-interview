@@ -32,6 +32,10 @@ export interface TaskRack {
   completed: boolean
 }
 
+// [AI assisted 006] 這張表推翻了前一版的 `TaskRack` const object（enum 風格）。使用者
+// 直接給了資料結構，關鍵在 `completed` 這一欄：分架規則進了表裡之後，看板不再認得
+// `open` / `done` 這兩個名字，加一個架只要多寫一列。TaskList 元件裡原本那張 `RACKS`
+// 對照表因此變成死碼，已一併刪除。
 /**
  * The board's racks, in the order they hang.
  *

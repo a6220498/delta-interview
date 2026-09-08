@@ -67,6 +67,11 @@ const markLabel = computed(
  */
 const menuButton = useTemplateRef<HTMLButtonElement>('menuButton')
 
+// [AI assisted 006] 面板歸卡片、關閉時整個不渲染，是使用者的裁示（「我搞錯了, 請幫我把
+// row menu 放到 TaskList 資料夾裡下 … 如果 row menu 沒有打開時, 請使用 v-if=false」），
+// 推翻了前一版「板子持有一個共用面板」的做法。連帶的必然結果是面板不能再用
+// defineExpose 的 open() / close()：沒渲染就沒有對象可呼叫，所以改成 props 進、事件出，
+// 而「選單開著沒有」這件事只留這一份、在卡片手上。
 /** Whether this card's row menu is up, which is also whether it is rendered. */
 const menuOpen = ref(false)
 

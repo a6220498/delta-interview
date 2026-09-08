@@ -73,6 +73,12 @@ function dismiss(byAnchor: boolean): void {
   rowMenuEl.value?.hidePopover()
 }
 
+// [AI assisted 006] 這段的時序是踩出來的。三點鈕要能「再按一次關掉」，而 popover 的
+// light dismiss 在 click 之前就把面板收掉了。前一版（板子共用的面板）先用「比對單號」，
+// 會讓滑鼠按過面板裡的編輯之後、再用鍵盤 Enter 同一張卡的第一次被吃掉；改成
+// `anchor.contains(按下去的東西)` 又恆真，按別張卡變成關閉。搬進卡片後索性不再依賴
+// popover 的 toggle 事件 —— 它是排進 task queue 非同步派送的，而「會不會趕在 click
+// 前面」在 jsdom 裡驗不到，所以改在 pointerdown 當下同步收掉並回報。
 /**
  * A press on the three-dot button, which closes the panel rather than reopening
  * it.
@@ -195,6 +201,11 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
+  <!--
+    [AI assisted 006] 這裡曾經寫成 `popover-open:grid`，型別檢查、lint、單元測試全過，
+    但 Tailwind 沒有這個 variant，兩條 class 會被靜默丟掉、build 也不報錯，面板開起來
+    沒有排版。是去翻 build 產出的 CSS 才抓到的。
+  -->
   <!--
     `open:` rather than `popover-open:` — Tailwind has no variant under the
     second name and drops the two utilities silently, leaving the panel

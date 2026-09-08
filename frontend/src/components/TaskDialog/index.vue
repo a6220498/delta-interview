@@ -35,6 +35,11 @@ import {
 } from './const'
 import type { TaskDialogEmits, TaskDialogExposed, TaskDialogMode, TaskDialogOpen } from './types'
 
+// [AI assisted 006] 這個元件一個 prop 都沒有，是使用者要求改用 defineExpose 的
+// open / close 之後的連帶決定：原本的 `open` 布林 prop 會變成第二個「彈窗開著沒有」的
+// 主人，而瀏覽器自己就會關 dialog（Esc、backdrop），父層那份遲早跟元素本身不同步。
+// 唯一事實來源改成 <dialog> 的 open 屬性，showModal() 前也因此要擋一次 —— 對已開啟的
+// dialog 呼叫會丟 InvalidStateError，而「開著時換成另一張單」是合理操作。
 const emit = defineEmits<TaskDialogEmits>()
 
 /**

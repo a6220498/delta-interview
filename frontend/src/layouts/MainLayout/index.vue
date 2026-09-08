@@ -24,6 +24,9 @@ import type { MainLayoutEmits, MainLayoutProps } from './types'
 
 withDefaults(defineProps<MainLayoutProps>(), MAIN_LAYOUT_DEFAULTS)
 
+// [AI assisted 006] 主要動作走 emit 而不是收一個 function prop。使用者的指示是「右側
+// 按鈕點下去的功能 由外部傳入」，emit 一樣是外部傳入，差別在這條列只負責「按鈕長在哪、
+// 按起來什麼樣」，不必知道按下去要花多少代價 —— 決定權留在掛載它的那一頁。
 const emit = defineEmits<MainLayoutEmits>()
 </script>
 

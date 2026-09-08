@@ -99,6 +99,9 @@ function close(): void {
 
 defineExpose<DeleteDialogExposed>({ open, close })
 
+// [AI assisted 006] 確定不會自己關窗：刪除可能失敗（404、斷線），關窗留給呼叫端在
+// DELETE 回來之後做 —— 一張已經消失的確認框會把問題連同答案一起帶走。跟 TaskDialog 的
+// submit 同一條規則。
 /**
  * Hands the answer up, with the docket it is about.
  *
