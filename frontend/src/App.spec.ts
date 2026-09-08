@@ -1,3 +1,4 @@
+import DeleteDialog from '@/components/DeleteDialog/index.vue'
 import TaskDialog from '@/components/TaskDialog/index.vue'
 import TaskList from '@/components/TaskList/index.vue'
 import type { Task } from '@/types/task'
@@ -46,12 +47,36 @@ function task(overrides: Partial<Task> = {}): Task {
   }
 }
 
+/** Mounts the whole board. */
+function mountBoard() {
+  return mount(App)
+}
+
+type Board = ReturnType<typeof mountBoard>
+
+/**
+ * The task sheet's own `<dialog>`, and the confirmation's.
+ *
+ * Asked for through the component rather than with `get('dialog')`: the board
+ * mounts two dialogs now, and a bare tag selector takes whichever is written
+ * first — these assertions would go on passing while pointing at the other
+ * sheet the first time the template is reordered.
+ */
+function sheetOf(board: Board) {
+  return board.findComponent(TaskDialog).get('dialog')
+}
+
+/** The delete confirmation's own `<dialog>`. */
+function confirmOf(board: Board) {
+  return board.findComponent(DeleteDialog).get('dialog')
+}
+
 describe('App', () => {
   it('mounts the masthead into the layout header landmark rather than the content area', () => {
     // The wiring is the thing under test: the layout exposes two insertion
     // points and the masthead has to take the header one, or the page ships
     // its title inside <main> and the landmark it left behind is empty.
-    const wrapper = mount(App)
+    const wrapper = mountBoard()
 
     expect(wrapper.get('header').text()).toContain('任務管理應用程式')
     expect(wrapper.get('main').text()).not.toContain('任務管理應用程式')
@@ -63,7 +88,7 @@ describe('App', () => {
     // against the literal ids rather than against `TASK_RACKS` itself: an
     // expectation read from the same table the loop reads would pass however
     // the table is rewritten.
-    const wrapper = mount(App)
+    const wrapper = mountBoard()
 
     expect(wrapper.findAllComponents(TaskList).map((tray) => tray.props('rack').id)).toEqual([
       'open',
@@ -81,7 +106,7 @@ describe('App', () => {
     // Vacuously true while the board has no data source, but it is the rule
     // that has to survive the store landing: no task on both shelves, none
     // missing from both.
-    const wrapper = mount(App)
+    const wrapper = mountBoard()
     const [open, done] = wrapper.findAllComponents(TaskList)
 
     expect(open?.props('tasks').every((task) => !task.completed)).toBe(true)
@@ -94,23 +119,23 @@ describe('App', () => {
       // only do that while it is still in the document; down, because the board
       // is what the page opens on. One element serves both jobs — it is opened
       // by name, so there is no second sheet to keep in step with this one.
-      const wrapper = mount(App)
+      const wrapper = mountBoard()
 
       expect(wrapper.findAllComponents(TaskDialog)).toHaveLength(1)
-      expect(wrapper.get('dialog').attributes('open')).toBeUndefined()
+      expect(sheetOf(wrapper).attributes('open')).toBeUndefined()
     })
 
     it("opens a blank sheet from the layout's primary action", async () => {
       // The layout reports the press and decides nothing, so this wiring is the
       // only thing that turns 新增工單 into an open sheet.
-      const wrapper = mount(App)
+      const wrapper = mountBoard()
 
       wrapper.findComponent(MainLayout).vm.$emit('action')
       await nextTick()
 
-      expect(wrapper.get('dialog').attributes('open')).toBeDefined()
-      expect(wrapper.get('dialog h2').text()).toBe('新增工單')
-      expect(wrapper.get('dialog [data-number]').text()).toBe('NEW')
+      expect(sheetOf(wrapper).attributes('open')).toBeDefined()
+      expect(sheetOf(wrapper).get('h2').text()).toBe('新增工單')
+      expect(sheetOf(wrapper).get('[data-number]').text()).toBe('NEW')
     })
 
     it('opens an edit sheet on the task whose docket was asked about', async () => {
@@ -118,14 +143,14 @@ describe('App', () => {
       // into a sheet carrying the values to correct. Asserted through the sheet's
       // own fields rather than through a prop, because there is no longer a prop
       // to assert on — the task is handed over in the call that opens it.
-      const wrapper = mount(App)
+      const wrapper = mountBoard()
 
       wrapper.findComponent(TaskList).vm.$emit('menu', task())
       await nextTick()
 
-      expect(wrapper.get('dialog').attributes('open')).toBeDefined()
-      expect(wrapper.get('dialog h2').text()).toBe('編輯工單')
-      expect(wrapper.get('dialog [data-number]').text()).toBe('bug-0012')
+      expect(sheetOf(wrapper).attributes('open')).toBeDefined()
+      expect(sheetOf(wrapper).get('h2').text()).toBe('編輯工單')
+      expect(sheetOf(wrapper).get('[data-number]').text()).toBe('bug-0012')
       expect(wrapper.get<HTMLInputElement>('[data-field="title"] input').element.value).toBe(
         '補上 CORS 設定',
       )
@@ -135,14 +160,14 @@ describe('App', () => {
       // The board holds one sheet and moves it between jobs, so 新增工單 pressed
       // after an edit has to arrive at a blank form rather than at the last task
       // opened.
-      const wrapper = mount(App)
+      const wrapper = mountBoard()
 
       wrapper.findComponent(TaskList).vm.$emit('menu', task())
       await nextTick()
       wrapper.findComponent(MainLayout).vm.$emit('action')
       await nextTick()
 
-      expect(wrapper.get('dialog h2').text()).toBe('新增工單')
+      expect(sheetOf(wrapper).get('h2').text()).toBe('新增工單')
       expect(wrapper.get<HTMLInputElement>('[data-field="title"] input').element.value).toBe('')
     })
 
@@ -150,7 +175,7 @@ describe('App', () => {
       // Only closes it. Filing the task needs an `id` and a `sequence`, and the
       // contract gives both to the server so that no two clients can issue the
       // same number — so nothing is added to the board here.
-      const wrapper = mount(App)
+      const wrapper = mountBoard()
 
       wrapper.findComponent(MainLayout).vm.$emit('action')
       await nextTick()
@@ -162,8 +187,52 @@ describe('App', () => {
       })
       await nextTick()
 
-      expect(wrapper.get('dialog').attributes('open')).toBeUndefined()
+      expect(sheetOf(wrapper).attributes('open')).toBeUndefined()
       expect(wrapper.findComponent(TaskList).props('tasks')).toEqual([])
+    })
+  })
+
+  describe('刪除確認', () => {
+    it('keeps the confirmation mounted but down, alongside the sheet', () => {
+      // Two dialogs on the page from the first paint, both waiting to be asked
+      // for: the confirmation is mounted for the same reason the sheet is, so
+      // the browser can hand focus back to whatever raised it.
+      const wrapper = mountBoard()
+
+      expect(wrapper.findAllComponents(DeleteDialog)).toHaveLength(1)
+      expect(confirmOf(wrapper).attributes('open')).toBeUndefined()
+      expect(sheetOf(wrapper).attributes('open')).toBeUndefined()
+    })
+
+    it('closes the confirmation when it is answered', async () => {
+      // Raised through the component's own `open()` rather than through the
+      // board, because nothing on the board reaches it yet: 刪除 arrives with
+      // the row menu the card's 三點鈕 is meant to open. What is under test is
+      // the other half of the wiring — that an answered question is taken away
+      // by the board rather than by the confirmation itself.
+      const wrapper = mountBoard()
+      const confirmation = wrapper.findComponent(DeleteDialog)
+
+      confirmation.vm.open(task())
+      await nextTick()
+      expect(confirmOf(wrapper).attributes('open')).toBeDefined()
+
+      confirmation.vm.$emit('confirm', task())
+      await nextTick()
+
+      expect(confirmOf(wrapper).attributes('open')).toBeUndefined()
+    })
+
+    it('takes nothing off the board when a delete is confirmed', async () => {
+      // Only closes it. Removing the task is the store's step, and a board that
+      // forgot a task the server still holds would put it back on the next load.
+      const wrapper = mountBoard()
+      const before = wrapper.findComponent(TaskList).props('tasks')
+
+      wrapper.findComponent(DeleteDialog).vm.$emit('confirm', task())
+      await nextTick()
+
+      expect(wrapper.findComponent(TaskList).props('tasks')).toEqual(before)
     })
   })
 })

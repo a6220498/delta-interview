@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { ref, useTemplateRef } from 'vue'
 
+import DeleteDialog from '@/components/DeleteDialog/index.vue'
+import type { DeleteDialogExposed } from '@/components/DeleteDialog/types'
 import Header from '@/components/Header/index.vue'
 import TaskDialog from '@/components/TaskDialog/index.vue'
 import type { TaskDialogExposed } from '@/components/TaskDialog/types'
@@ -68,6 +70,37 @@ function openEdit(task: Task): void {
 }
 
 /**
+ * The confirmation, held the same way as the sheet above.
+ *
+ * A second element rather than a mode on the first: the two ask for different
+ * things — one is a form that can be filled in wrongly, the other is a question
+ * with two answers — and merging them would mean a sheet whose fields, whose
+ * heading colour and whose buttons all depend on which of the two it currently
+ * is. They share the paper, not the component.
+ *
+ * Held but not yet raised: the card's 三點鈕 goes straight to the edit sheet for
+ * now, and 刪除 is the second entry of the row menu that button is meant to
+ * open. `deleteDialogEl.value?.open(task)` is what that entry will call — it is
+ * left unwritten rather than written and unreachable, so the board carries no
+ * line that nothing can run.
+ */
+const deleteDialogEl = useTemplateRef<DeleteDialogExposed>('deleteDialogEl')
+
+/**
+ * Closes an answered confirmation, and nothing else — for now.
+ *
+ * Removing the task is the same step as the store above, so the task the
+ * confirmation hands up is dropped here rather than spliced out of the local
+ * array: there is no source to delete it from yet, and a board that forgot a
+ * task the server still holds would put it back on the next load. The
+ * confirmation waits to be closed rather than closing itself precisely so that
+ * this line can move below a `DELETE` that might fail.
+ */
+function onConfirmDelete(): void {
+  deleteDialogEl.value?.close()
+}
+
+/**
  * Closes a submitted sheet, and nothing else — for now.
  *
  * Writing the task is the same step as the store above, and the values arriving
@@ -124,5 +157,20 @@ function onSubmit(): void {
   <TaskDialog
     ref="taskDialogEl"
     @submit="onSubmit"
+  />
+
+  <!--
+    The confirmation, mounted beside the sheet and outside `MainLayout` for the
+    same two reasons: a modal renders in the top layer wherever it is written,
+    and it has to still be here when it closes for the browser to hand focus
+    back to whatever asked the question.
+
+    It is up to nothing on its own — `open(task)` is the only thing that raises
+    it, and it is answered by an event rather than by a return value, so a
+    delete that has to go to the server can take as long as it takes.
+  -->
+  <DeleteDialog
+    ref="deleteDialogEl"
+    @confirm="onConfirmDelete"
   />
 </template>

@@ -47,7 +47,7 @@ const emit = defineEmits<TaskDialogEmits>()
  */
 const uid = useId()
 
-const sheet = useTemplateRef<HTMLDialogElement>('sheet')
+const taskDialogEl = useTemplateRef<HTMLDialogElement>('taskDialogEl')
 const titleInput = useTemplateRef<HTMLInputElement>('titleInput')
 
 /** Which of the two jobs this sheet is currently doing. */
@@ -120,7 +120,7 @@ const open: TaskDialogOpen = (nextMode: TaskDialogMode, task?: Task): void => {
   source.value = task ?? null
   seed()
 
-  const element = sheet.value
+  const element = taskDialogEl.value
 
   if (!element) {
     return
@@ -145,7 +145,7 @@ const open: TaskDialogOpen = (nextMode: TaskDialogMode, task?: Task): void => {
 
 /** Takes the sheet away; a no-op if it is already down. */
 function close(): void {
-  const element = sheet.value
+  const element = taskDialogEl.value
 
   if (element?.open) {
     element.close()
@@ -194,7 +194,7 @@ function onSubmit(): void {
     and the head and the form each carry their own.
   -->
   <dialog
-    ref="sheet"
+    ref="taskDialogEl"
     :aria-labelledby="`${uid}-heading`"
     class="m-auto w-[min(430px,calc(100vw-32px))] rounded-sm border border-t-[3px] border-rule border-t-ink bg-stock p-0 text-ink shadow-[0_14px_38px_rgba(31,28,24,0.34)] backdrop:bg-[rgba(31,28,24,0.44)]"
     @close="emit('close')"
