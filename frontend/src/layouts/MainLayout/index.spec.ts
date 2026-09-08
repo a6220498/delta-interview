@@ -1,7 +1,7 @@
 import { mount } from '@vue/test-utils'
 import { describe, expect, it } from 'vitest'
 
-import MainLayout from './MainLayout.vue'
+import MainLayout from './index.vue'
 
 /**
  * The text a screen reader would announce for `element`: its text content with

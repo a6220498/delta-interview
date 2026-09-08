@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import Header from '@/components/Header.vue'
-import MainLayout from '@/layouts/MainLayout.vue'
+import Header from '@/components/Header/index.vue'
+import MainLayout from '@/layouts/MainLayout/index.vue'
 </script>
 
 <template>

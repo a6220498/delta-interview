@@ -1,7 +1,7 @@
 import { mount } from '@vue/test-utils'
 import { describe, expect, it } from 'vitest'
 
-import Header from './Header.vue'
+import Header from './index.vue'
 
 describe('Header', () => {
   it('names the application in a level-1 heading, so the document has an outline', () => {

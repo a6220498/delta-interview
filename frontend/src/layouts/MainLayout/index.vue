@@ -13,37 +13,18 @@
  *
  * The heading row is the other way round: its geometry is fixed by the spec, so
  * the frame draws it and takes only its wording and its click as inputs. The
- * layout never decides what the button *does* — see `action` below.
+ * layout never decides what the button *does* — see `action` in `./types`.
  *
  * `<header>` and `<main>` rather than two `<div>`s: those are free landmarks a
  * screen reader can jump between, and the div version would have to earn the
  * same thing back with explicit `role` attributes.
  */
+import { MAIN_LAYOUT_DEFAULTS } from './const'
+import type { MainLayoutEmits, MainLayoutProps } from './types'
 
-interface Props {
-  /** Content-area title. Defaults to the board's, the only screen so far. */
-  heading?: string
-  /**
-   * Accessible name and visible label of the primary action button. The `＋`
-   * glyph beside it is decoration and stays out of the name.
-   */
-  actionLabel?: string
-}
+withDefaults(defineProps<MainLayoutProps>(), MAIN_LAYOUT_DEFAULTS)
 
-withDefaults(defineProps<Props>(), {
-  heading: '看板 / Board',
-  actionLabel: '新增工單',
-})
-
-const emit = defineEmits<{
-  /**
-   * The primary action button was pressed. Deliberately an event rather than a
-   * handler prop: the layout should not be able to tell what opening a task
-   * costs, and an event keeps the decision — open a dialog, route, do nothing —
-   * with the screen that mounted it.
-   */
-  action: []
-}>()
+const emit = defineEmits<MainLayoutEmits>()
 </script>
 
 <template>

@@ -16,3 +16,12 @@ export type Problem = components['schemas']['Problem']
 
 /** Completion filter for the task list; `'all'` means "send no filter". */
 export type TaskFilter = 'all' | 'active' | 'completed'
+
+/**
+ * Which shelf a task sits on.
+ *
+ * A projection of `completed`, not a third state: the board has exactly two
+ * racks, and naming them keeps the two trays from being told apart by a raw
+ * boolean at every call site.
+ */
+export type TaskRack = 'open' | 'done'
