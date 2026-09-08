@@ -1,5 +1,5 @@
-import { listTasks } from '@/api/tasks'
-import type { Task, TaskFilter } from '@/types/task'
+import { getTask, listTasks } from '@/api/tasks'
+import type { Task, TaskFilter, TaskSummary } from '@/types/task'
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 
@@ -23,8 +23,13 @@ export const useTasksStore = defineStore('tasks', () => {
    * Held as one flat list rather than pre-split per rack: which shelf a task
    * belongs on is `completed`, and a second copy of that decision is how a task
    * lands on both shelves or on neither.
+   *
+   * Rows, not whole tasks: the contract's list endpoint answers without
+   * `description`, and the type says so, so nothing downstream can read a
+   * detail the board never received. {@link fetchTask} is where the whole task
+   * comes from.
    */
-  const tasks = ref<Task[]>([])
+  const tasks = ref<TaskSummary[]>([])
 
   /**
    * Whether a load is currently in flight.
@@ -76,5 +81,39 @@ export const useTasksStore = defineStore('tasks', () => {
     }
   }
 
-  return { tasks, loading, error, fetchTasks }
+  /**
+   * Fetches one whole task — detail included — from `GET /api/tasks/{id}`.
+   *
+   * The board's rows deliberately carry no `description`, so the sheet that
+   * edits a task asks for the one docket it is about. Without this the sheet
+   * would open on an empty 說明 and save that emptiness over detail its reader
+   * was never shown.
+   *
+   * A failure is reported by handing back nothing rather than by throwing —
+   * the same bargain {@link fetchTasks} makes, so the caller opens the sheet
+   * behind an `if` and needs no catch. The reason still lands in {@link error},
+   * because a 編輯 that quietly does nothing cannot be told apart from a broken
+   * button.
+   *
+   * Deliberately leaves {@link tasks} and {@link loading} alone. `loading` is
+   * the board's own flag — it is what puts 載入中 in both trays — and one
+   * docket being fetched is not the shelves being refetched. A success does not
+   * clear {@link error} either: a refresh that failed has still failed, and the
+   * notice it put up is about the board rather than about this request.
+   *
+   * @param id - The task to fetch.
+   * @returns The whole task, or `null` when it could not be fetched.
+   */
+  async function fetchTask(id: string): Promise<Task | null> {
+    try {
+      return await getTask(id)
+    } catch (cause) {
+      // Not only `ApiError`: `fetch` itself rejects with a TypeError when the
+      // backend is not running, which is the likeliest failure in development.
+      error.value = cause instanceof Error ? cause.message : String(cause)
+      return null
+    }
+  }
+
+  return { tasks, loading, error, fetchTasks, fetchTask }
 })

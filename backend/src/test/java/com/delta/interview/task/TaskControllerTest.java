@@ -177,6 +177,27 @@ class TaskControllerTest {
         }
 
         @Test
+        @DisplayName("leaves description out of the list, and keeps it on the single task")
+        void listOmitsDescription() throws Exception {
+            UUID id = UUID.fromString(create("{\"title\":\"detail lives one request away\",\"category\":0,"
+                            + "\"description\":\"The one field no card on the board draws\"}")
+                    .get("id")
+                    .asText());
+
+            // A filter that matches nothing is an empty result, not an absent field:
+            // hasSize(0) here says the row carried no description at all.
+            mockMvc.perform(get("/api/tasks"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$[?(@.id=='" + id + "')]", hasSize(1)))
+                    .andExpect(jsonPath("$[?(@.id=='" + id + "')].description", hasSize(0)));
+
+            // The detail is not gone, only moved: this is where the edit sheet reads it.
+            mockMvc.perform(get("/api/tasks/{id}", id))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.description", is("The one field no card on the board draws")));
+        }
+
+        @Test
         @DisplayName("returns 404 problem details for an unknown id")
         void unknownIdIsNotFound() throws Exception {
             mockMvc.perform(get("/api/tasks/{id}", UUID.randomUUID()))

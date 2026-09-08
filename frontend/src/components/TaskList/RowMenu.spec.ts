@@ -1,4 +1,4 @@
-import type { Task } from '@/types/task'
+import type { TaskSummary } from '@/types/task'
 import { enableAutoUnmount, mount } from '@vue/test-utils'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -97,14 +97,13 @@ function anchorAt(box: Partial<DOMRect> = BUTTON): HTMLButtonElement {
   return button
 }
 
-/** Builds a task fixture; only the fields the panel reads are varied. */
-function task(overrides: Partial<Task> = {}): Task {
+/** Builds a board row; only the fields the panel reads are varied. */
+function task(overrides: Partial<TaskSummary> = {}): TaskSummary {
   return {
     id: '3f1a7c2e-9b04-4f5d-8a11-6c2d5e0f7b31',
     category: 1,
     sequence: 12,
     title: '補上 CORS 設定',
-    description: null,
     completed: false,
     dueDate: null,
     createdAt: '2026-09-06T10:00:00Z',
@@ -114,7 +113,7 @@ function task(overrides: Partial<Task> = {}): Task {
 }
 
 /** Mounts the panel, which is to say opens it: it is up from the first paint. */
-function mountMenu(anchor: HTMLElement = anchorAt(), subject: Task = task()) {
+function mountMenu(anchor: HTMLElement = anchorAt(), subject: TaskSummary = task()) {
   return mount(RowMenu, { props: { task: subject, anchor }, attachTo: document.body })
 }
 

@@ -1,4 +1,4 @@
-import type { Task } from '@/types/task'
+import type { TaskSummary } from '@/types/task'
 
 /**
  * Inputs for the panel that hangs under one docket's three-dot button.
@@ -17,7 +17,7 @@ export interface RowMenuProps {
    * top layer, visually detached from the card it belongs to, and the number is
    * what ties the two back together before someone presses 刪除.
    */
-  task: Task
+  task: TaskSummary
   /**
    * The three-dot button the panel hangs from.
    *

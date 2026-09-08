@@ -1,4 +1,4 @@
-import type { CreateTaskRequest, Task, TaskFilter, UpdateTaskRequest } from '@/types/task'
+import type { CreateTaskRequest, Task, TaskFilter, TaskSummary, UpdateTaskRequest } from '@/types/task'
 
 import { request } from './http'
 
@@ -17,20 +17,29 @@ const COMPLETED_BY_FILTER: Record<Exclude<TaskFilter, 'all'>, 'true' | 'false'> 
  * rather than in the client: filtering after the fact would make that parameter
  * dead and would still pull every task over the wire.
  *
+ * The rows come back as {@link TaskSummary} — the task without its
+ * `description`. No card on the board draws the detail and it is the one
+ * unbounded field a task has, so it travels one docket at a time through
+ * {@link getTask} instead of on every row of every refresh.
+ *
  * @param filter - which tasks to fetch; `'all'` sends no query parameter.
- * @returns the matching tasks, newest first.
+ * @returns the matching tasks, newest first, each without its description.
  * @throws {ApiError} when the backend answers with a non-2xx status.
  */
-export function listTasks(filter: TaskFilter = 'all'): Promise<Task[]> {
+export function listTasks(filter: TaskFilter = 'all'): Promise<TaskSummary[]> {
   const path = filter === 'all' ? TASKS_PATH : `${TASKS_PATH}?completed=${COMPLETED_BY_FILTER[filter]}`
-  return request<Task[]>(path)
+  return request<TaskSummary[]>(path)
 }
 
 /**
- * Fetches a single task.
+ * Fetches a single task, detail included.
+ *
+ * The only place a `description` comes from: {@link listTasks} leaves it out,
+ * so whoever needs the whole task — the edit sheet — asks for that one task
+ * here.
  *
  * @param id - the task's identifier.
- * @returns the task.
+ * @returns the whole task, `description` and all.
  * @throws {ApiError} 404 when no task has that id.
  */
 export function getTask(id: string): Promise<Task> {

@@ -1,7 +1,7 @@
 import DeleteDialog from '@/components/DeleteDialog/index.vue'
 import TaskDialog from '@/components/TaskDialog/index.vue'
 import TaskList from '@/components/TaskList/index.vue'
-import type { Task } from '@/types/task'
+import type { Task, TaskSummary } from '@/types/task'
 import { flushPromises, mount } from '@vue/test-utils'
 import { createPinia } from 'pinia'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -53,20 +53,30 @@ afterEach(() => {
   Reflect.deleteProperty(HTMLDialogElement.prototype, 'close')
 })
 
-/** Builds a task fixture; only the fields the board reads are varied. */
-function task(overrides: Partial<Task> = {}): Task {
+/**
+ * Builds one of the rows the board loads; only the fields it reads are varied.
+ *
+ * A `TaskSummary` and not a `Task`, because that is what `GET /api/tasks`
+ * answers with: no `description` on it at all. The board's fixtures say so, so
+ * a test cannot lean on detail the shelf never receives.
+ */
+function task(overrides: Partial<TaskSummary> = {}): TaskSummary {
   return {
     id: '3f1a7c2e-9b04-4f5d-8a11-6c2d5e0f7b31',
     category: 1,
     sequence: 12,
     title: '補上 CORS 設定',
-    description: null,
     completed: false,
     dueDate: null,
     createdAt: '2026-09-06T10:00:00Z',
     updatedAt: '2026-09-06T10:00:00Z',
     ...overrides,
   }
+}
+
+/** Builds the whole task `GET /api/tasks/{id}` answers with: the row plus its detail. */
+function detail(overrides: Partial<Task> = {}): Task {
+  return { ...task(), description: '前端在 5173，後端在 8080。', ...overrides }
 }
 
 /**
@@ -247,15 +257,17 @@ describe('App', () => {
     })
 
     it('opens an edit sheet on the task whose docket was asked about', async () => {
-      // 編輯 is chosen in the card's own row menu; the tray attaches the task
-      // on the way up, and the board is what turns that into a sheet carrying
-      // the values to correct. Asserted through the sheet's own fields rather
-      // than through a prop, because there is no longer a prop to assert on —
-      // the task is handed over in the call that opens it.
+      // 編輯 is chosen in the card's own row menu; the tray attaches the row on
+      // the way up, and the board is what turns that into a sheet carrying the
+      // values to correct. Asserted through the sheet's own fields rather than
+      // through a prop, because there is no longer a prop to assert on — the
+      // task is handed over in the call that opens it.
       const wrapper = mountBoard()
+      await flushPromises()
 
+      fetchMock.mockResolvedValue(jsonResponse(200, detail()))
       wrapper.findComponent(TaskList).vm.$emit('edit', task())
-      await nextTick()
+      await flushPromises()
 
       expect(sheetOf(wrapper).attributes('open')).toBeDefined()
       expect(sheetOf(wrapper).get('h2').text()).toBe('編輯工單')
@@ -265,14 +277,50 @@ describe('App', () => {
       )
     })
 
+    it('fetches the docket before opening it, because the shelf never held its detail', async () => {
+      // The rows come back without a description, so the 說明 field can only be
+      // filled from `GET /api/tasks/{id}`. Without this request the sheet would
+      // open on a blank description and saving it would clear detail the person
+      // was never shown.
+      const wrapper = mountBoard()
+      await flushPromises()
+
+      fetchMock.mockResolvedValue(jsonResponse(200, detail()))
+      wrapper.findComponent(TaskList).vm.$emit('edit', task())
+      await flushPromises()
+
+      expect(lastUrl()).toBe('/api/tasks/3f1a7c2e-9b04-4f5d-8a11-6c2d5e0f7b31')
+      expect(
+        wrapper.get<HTMLTextAreaElement>('[data-field="description"] textarea').element.value,
+      ).toBe('前端在 5173，後端在 8080。')
+    })
+
+    it('keeps the sheet down when the docket cannot be fetched, and says why', async () => {
+      // A sheet opened on half a task is worse than no sheet: it would show an
+      // empty 說明 for a task that has one. The reader gets the reason instead.
+      const wrapper = mountBoard()
+      await flushPromises()
+
+      fetchMock.mockResolvedValue(
+        jsonResponse(404, { status: 404, title: 'Not Found', detail: '這張單子已經不在了。' }),
+      )
+      wrapper.findComponent(TaskList).vm.$emit('edit', task())
+      await flushPromises()
+
+      expect(sheetOf(wrapper).attributes('open')).toBeUndefined()
+      expect(wrapper.get('[role="alert"]').text()).toContain('這張單子已經不在了。')
+    })
+
     it('opens the same sheet blank again after an edit', async () => {
       // The board holds one sheet and moves it between jobs, so 新增工單 pressed
       // after an edit has to arrive at a blank form rather than at the last task
       // opened.
       const wrapper = mountBoard()
+      await flushPromises()
 
+      fetchMock.mockResolvedValue(jsonResponse(200, detail()))
       wrapper.findComponent(TaskList).vm.$emit('edit', task())
-      await nextTick()
+      await flushPromises()
       wrapper.findComponent(MainLayout).vm.$emit('action')
       await nextTick()
 

@@ -93,7 +93,7 @@ Vite 會把 `/api` proxy 到 `localhost:8080`，因此開發環境同源、後�
 | 標記完成 / 未完成 | `PATCH /api/tasks/{id}/completion` |
 | 刪除任務 | `DELETE /api/tasks/{id}` |
 
-三個刻意的設計決定：
+四個刻意的設計決定：
 
 1. **完成狀態獨立成一個 endpoint**。`PUT /{id}` 只 replace 可編輯欄位（標題、描述、
    類別、到期日），儲存編輯表單因此不可能順帶把已完成的任務重新打開。
@@ -103,6 +103,10 @@ Vite 會把 `/api` proxy 到 `localhost:8080`，因此開發環境同源、後�
    **不需要另開一支反向 endpoint** —— 同一件事有兩個入口只會讓兩邊語意慢慢分岔。
 3. **`id` 與工單編號是兩個東西**。`id` 給機器用（路由、請求、快取鍵），永遠不變；
    人看的編號是 `category` + `sequence` 這一對。詳見〈領域模型〉。
+4. **列表不回傳 `description`**。看板上的卡片不畫說明，而它是任務裡唯一沒有小上限的
+   欄位（2000 字，標題的十倍）—— 每次載入、每次重整都把 payload 裡最大的欄位送給一個
+   從來不讀它的畫面，代價全花在看不到的地方。要看細節的人（編輯工單）用
+   `GET /{id}` 拿那一張就好。詳見〈領域模型〉。
 
 錯誤一律以 RFC 9457 problem details 回傳，對應契約中的 `Problem` schema。
 
@@ -110,6 +114,24 @@ Vite 會把 `/api` proxy 到 `localhost:8080`，因此開發環境同源、後�
 
 模型和 endpoint 一樣定義在 [`api/openapi.yaml`](api/openapi.yaml) 的 `components.schemas`，
 兩端的表示法都由它產生，沒有任何手寫的傳輸型別。
+
+### 回應的兩個形狀：`TaskSummary` 與 `Task`
+
+| Schema | 用於 | 內容 |
+|---|---|---|
+| `TaskSummary` | `GET /api/tasks`（列表） | 除了 `description` 以外的所有欄位 |
+| `Task` | `GET /api/tasks/{id}`，以及建立／修改／標記完成的回應 | `TaskSummary` + `description` |
+
+`Task` 在契約裡是用 `allOf` 從 `TaskSummary` 組出來的，而不是抄第二份：卡片上要多畫一個
+欄位時只有一個地方要加，兩個形狀因此不會慢慢分岔。兩邊的產生器都會把 `allOf` 攤平 ——
+Java 得到兩個各自獨立的 model，TypeScript 得到 `TaskSummary & { description }`。
+
+分開的理由是卡片不畫說明，而 `description` 是任務裡唯一沒有小上限的欄位；代價是**編輯
+工單時要多一次 `GET /{id}`**，由前端 `App.vue` 的 `openEdit` 負責。這一次請求不是可有可無
+的：直接拿列表那一列開表單，說明欄會是空的，而存檔會把使用者從來沒看過的內容清掉。
+
+反過來說，**卡片上畫得出來的東西都必須留在 `TaskSummary`**。一個列表缺、卡片又要的欄位，
+會把「一次列表請求」變成「每列一次請求」。
 
 ### `Task`
 
@@ -119,7 +141,7 @@ Vite 會把 `/api` proxy 到 `localhost:8080`，因此開發環境同源、後�
 | `category` | `integer($int32)` `enum`：`0` / `1` | `TaskCategory` | `0 \| 1` | ✔ |
 | `sequence` | `integer($int32)`，≥ 1 | `Integer` | `number` | ✔（伺服器產生） |
 | `title` | `string`，1–200 字 | `String` | `string` | ✔ |
-| `description` | `string`，≤ 2000 字，nullable | `@Nullable String` | `string \| null` | — |
+| `description` | `string`，≤ 2000 字，nullable | `@Nullable String` | `string \| null` | —（只在 `Task`，列表不回傳） |
 | `completed` | `boolean` | `Boolean` | `boolean` | ✔ |
 | `dueDate` | `string($date)`，nullable | `@Nullable LocalDate` | `string \| null` | — |
 | `createdAt` | `string($date-time)` | `OffsetDateTime` | `string` | ✔（伺服器產生） |
@@ -246,3 +268,7 @@ backend/src/main/java/com/delta/interview/
 沒有另外做一層 domain entity 與 mapper：在沒有持久化層的情況下，第二份表示法
 沒有要解耦的對象。導入真正的資料庫時，在 `TaskRepository` 這個邊界加入
 persistence entity 與轉換即可，controller 與契約都不需要變動。
+
+倉庫一律存整張任務；**收窄成 `TaskSummary` 是在 `TaskController` 做的**。回應帶哪些欄位
+是契約的決定，倉庫的職責則是把任務完整地留著 —— 一個只發得出摘要的倉庫，就沒有東西可以
+回答 `GET /api/tasks/{id}` 了。

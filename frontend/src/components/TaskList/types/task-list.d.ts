@@ -1,5 +1,5 @@
 import type { TaskRack } from '@/const/task'
-import type { Task } from '@/types/task'
+import type { TaskSummary } from '@/types/task'
 
 /**
  * Inputs for one shelf of the board.
@@ -17,8 +17,14 @@ export interface TaskListProps {
    * the board's table and the two cannot disagree about what a shelf is called.
    */
   rack: TaskRack
-  /** The tasks to stack, already selected for this rack by the caller. */
-  tasks: Task[]
+  /**
+   * The tasks to stack, already selected for this rack by the caller.
+   *
+   * Rows rather than whole tasks: the list endpoint answers without
+   * `description`, so a card cannot draw detail that never arrived — and the
+   * type is what says so.
+   */
+  tasks: TaskSummary[]
   /**
    * Whether the board is still fetching.
    *
@@ -38,9 +44,9 @@ export interface TaskListProps {
  */
 export interface TaskListEmits {
   /** A card asked to change completion state, carrying the task it belongs to. */
-  toggle: [task: Task, completed: boolean]
+  toggle: [task: TaskSummary, completed: boolean]
   /** A card's 編輯 was chosen, carrying the task it belongs to. */
-  edit: [task: Task]
+  edit: [task: TaskSummary]
   /** A card's 刪除 was chosen, carrying the task it belongs to. */
-  delete: [task: Task]
+  delete: [task: TaskSummary]
 }

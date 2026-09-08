@@ -36,6 +36,11 @@ paths:
       description: |
         Filtering happens server-side rather than in the client so that a large
         task set never has to cross the wire just to be discarded by the UI.
+
+        The rows come back as `TaskSummary`, which is the task without its
+        `description`: no card on the board draws the detail, and it is the one
+        unbounded field a task has. Whoever needs it asks
+        `GET /api/tasks/{id}` for the single task being opened.
       parameters:
         - name: completed
           in: query
@@ -45,13 +50,13 @@ paths:
             type: boolean
       responses:
         '200':
-          description: The matching tasks, newest first.
+          description: The matching tasks, newest first, each without its detail.
           content:
             application/json:
               schema:
                 type: array
                 items:
-                  $ref: '#/components/schemas/Task'
+                  $ref: '#/components/schemas/TaskSummary'
 
     post:
       tags: [tasks]
@@ -229,10 +234,10 @@ components:
       x-enum-varnames: [FEATURE, BUG]
       example: 1
 
-    Task:
+    TaskSummary:
       type: object
       description: |
-        A task as stored by the backend.
+        A task as the board draws it: every field a docket on the shelf shows.
 
         Two identifiers, on purpose. `id` is the machine one — routes, requests,
         cache keys — and never changes. The number a human reads off the card is
@@ -240,6 +245,17 @@ components:
         `feat-0003` — the category's code picks the prefix, the serial is padded
         to four digits. Splitting them means the human-readable number can
         follow a task's category without ever breaking a URL.
+
+        Deliberately everything *but* `description`. No card renders the detail,
+        and it is the one unbounded field a task has — ten times the title's
+        limit — so shipping it with every row would send the largest field in
+        the payload to the one screen that never reads it, on every load and
+        every refresh. It is one request away at `GET /api/tasks/{id}`, which is
+        what the edit sheet asks for when a docket is opened.
+
+        Anything a card *does* draw belongs here rather than there: a field the
+        shelf needs but the summary lacks turns one list request into one
+        request per row.
       required: [id, category, sequence, title, completed, createdAt, updatedAt]
       properties:
         id:
@@ -266,11 +282,6 @@ components:
           minLength: 1
           maxLength: 200
           example: Write the OpenAPI contract
-        description:
-          type: string
-          maxLength: 2000
-          nullable: true
-          example: Cover all five task operations.
         completed:
           type: boolean
           example: false
@@ -294,6 +305,25 @@ components:
         updatedAt:
           type: string
           format: date-time
+
+    Task:
+      description: |
+        A whole task, as returned by every operation that answers about exactly
+        one of them: fetch, create, update and completion.
+
+        The summary plus its `description`. Composed rather than written out a
+        second time, so a field added to the board's rows cannot go missing from
+        the single-task responses — there is one place to add it, and the two
+        shapes cannot drift apart.
+      allOf:
+        - $ref: '#/components/schemas/TaskSummary'
+        - type: object
+          properties:
+            description:
+              type: string
+              maxLength: 2000
+              nullable: true
+              example: Cover all five task operations.
 
     CreateTaskRequest:
       type: object

@@ -1,20 +1,23 @@
 import { TASK_RACKS } from '@/const/task'
 import type { TaskRack } from '@/const/task'
-import type { Task } from '@/types/task'
+import type { TaskSummary } from '@/types/task'
 import { mount } from '@vue/test-utils'
 import { describe, expect, it } from 'vitest'
 
 import Card from './Card.vue'
 import TaskList from './index.vue'
 
-/** Builds a task fixture; only the fields this component reads are varied. */
-function task(overrides: Partial<Task> = {}): Task {
+/**
+ * Builds one of the rows the board hands down; only the fields this component
+ * reads are varied. A `TaskSummary` and not a `Task`: the shelf is drawn from
+ * what `GET /api/tasks` returns, which carries no description.
+ */
+function task(overrides: Partial<TaskSummary> = {}): TaskSummary {
   return {
     id: '3f1a7c2e-9b04-4f5d-8a11-6c2d5e0f7b31',
     category: 1,
     sequence: 12,
     title: '補上 CORS 設定',
-    description: null,
     completed: false,
     dueDate: null,
     createdAt: '2026-09-06T10:00:00Z',
@@ -46,7 +49,7 @@ function rack(id: string): TaskRack {
 }
 
 /** Mounts an in-tray holding `tasks`. */
-function mountList(tasks: Task[]) {
+function mountList(tasks: TaskSummary[]) {
   return mount(TaskList, { props: { rack: rack('open'), tasks } })
 }
 

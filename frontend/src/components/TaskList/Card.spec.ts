@@ -1,4 +1,4 @@
-import type { Task } from '@/types/task'
+import type { TaskSummary } from '@/types/task'
 import { enableAutoUnmount, mount } from '@vue/test-utils'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { nextTick } from 'vue'
@@ -40,13 +40,12 @@ enableAutoUnmount(afterEach)
  * plausibly run on — the card reads the real clock to decide "overdue", and a
  * fixture dated near today would start failing on some particular morning.
  */
-function task(overrides: Partial<Task> = {}): Task {
+function task(overrides: Partial<TaskSummary> = {}): TaskSummary {
   return {
     id: '3f1a7c2e-9b04-4f5d-8a11-6c2d5e0f7b31',
     category: 1,
     sequence: 12,
     title: '補上 CORS 設定，讓 5173 打得到 8080',
-    description: null,
     completed: false,
     dueDate: '2099-09-07',
     createdAt: '2026-09-06T10:00:00Z',
@@ -63,7 +62,7 @@ const LONG_PAST = '2020-01-04'
  * The row menu is a popover, and a popover has to be in the page to be shown at
  * all — so every test that opens one mounts through here.
  */
-function mountAttached(subject: Task = task()) {
+function mountAttached(subject: TaskSummary = task()) {
   return mount(Card, { props: { task: subject }, attachTo: document.body })
 }
 

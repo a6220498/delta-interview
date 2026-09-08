@@ -1,4 +1,4 @@
-import type { Task } from '@/types/task'
+import type { TaskSummary } from '@/types/task'
 
 /**
  * Inputs for the docket that draws one task.
@@ -9,8 +9,8 @@ import type { Task } from '@/types/task'
  * hand the card a state that disagrees with the data it is drawing.
  */
 export interface CardProps {
-  /** The task to draw. */
-  task: Task
+  /** The row to draw; everything a docket shows is on it. */
+  task: TaskSummary
 }
 
 /**

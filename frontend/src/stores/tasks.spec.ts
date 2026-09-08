@@ -1,4 +1,4 @@
-import type { Task } from '@/types/task'
+import type { Task, TaskSummary } from '@/types/task'
 import { createPinia, setActivePinia } from 'pinia'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -15,24 +15,41 @@ function jsonResponse(status: number, body: unknown): Response {
 const fetchMock = vi.fn<typeof fetch>()
 
 /**
- * Builds a task fixture.
+ * Builds one of the rows the list endpoint answers with.
  *
- * `satisfies Task` rather than a loose object literal: the contract owns this
- * shape, so a field added to `api/openapi.yaml` fails the type check here
- * instead of letting the store be tested against a task the server never sends.
+ * `satisfies TaskSummary` rather than a loose object literal: the contract owns
+ * this shape, so a field added to `api/openapi.yaml` fails the type check here
+ * instead of letting the store be tested against a row the server never sends.
+ * It also holds on to the point of this fixture — there is no `description` on
+ * it, because the list does not carry one.
  */
-function task(overrides: Partial<Task> = {}): Task {
+function task(overrides: Partial<TaskSummary> = {}): TaskSummary {
   return {
     id: '3f1a7c2e-9b04-4f5d-8a11-6c2d5e0f7b31',
     // 0 = feature，1 = bug；對照表在 api/openapi.yaml 的 TaskCategory。
     category: 0,
     sequence: 3,
     title: '補上 CORS 設定',
-    description: null,
     completed: false,
     dueDate: null,
     createdAt: '2026-09-06T10:00:00Z',
     updatedAt: '2026-09-06T10:00:00Z',
+    ...overrides,
+  } satisfies TaskSummary
+}
+
+/**
+ * Builds the whole task that `GET /api/tasks/{id}` answers with.
+ *
+ * The same row plus the one field the shelf never carries. Given a description
+ * rather than defaulting it to `null`, because a detail that cannot be told
+ * apart from the row it came from would let the assertions below pass against
+ * a fetch that never happened.
+ */
+function detail(overrides: Partial<Task> = {}): Task {
+  return {
+    ...task(),
+    description: '把 8080 的 CORS 設定補上，5173 才打得到。',
     ...overrides,
   } satisfies Task
 }
@@ -165,6 +182,69 @@ describe('tasks store', () => {
       await store.fetchTasks()
 
       expect(store.error).toBeNull()
+    })
+  })
+
+  describe('fetchTask', () => {
+    const ID = '3f1a7c2e-9b04-4f5d-8a11-6c2d5e0f7b31'
+
+    it('asks the single-task endpoint for the detail the list leaves out', async () => {
+      // The whole reason this exists: the rows carry no description, so the
+      // only place the edit sheet can get one is this second request.
+      fetchMock.mockResolvedValue(jsonResponse(200, detail()))
+      const store = useTasksStore()
+
+      const fetched = await store.fetchTask(ID)
+
+      expect(lastUrl()).toBe(`/api/tasks/${ID}`)
+      expect(fetched?.description).toBe('把 8080 的 CORS 設定補上，5173 才打得到。')
+    })
+
+    it('leaves the shelves alone while it runs: one docket is not the board', async () => {
+      // `loading` is what makes both trays say 載入中 over their empty box, so
+      // opening one docket must not claim the whole board is being refetched.
+      const store = useTasksStore()
+      fetchMock.mockResolvedValue(jsonResponse(200, [task({ id: 'a' })]))
+      await store.fetchTasks()
+
+      let settle: (response: Response) => void = () => {}
+      fetchMock.mockReturnValue(
+        new Promise<Response>((resolve) => {
+          settle = resolve
+        }),
+      )
+      const pending = store.fetchTask(ID)
+
+      expect(store.loading).toBe(false)
+
+      settle(jsonResponse(200, detail()))
+      await pending
+
+      expect(store.tasks.map((filed) => filed.id)).toEqual(['a'])
+    })
+
+    it('hands back null rather than throwing when the docket cannot be fetched', async () => {
+      // So the caller opens the sheet behind an `if` and needs no catch of its
+      // own — the same bargain `fetchTasks` makes with its own failures.
+      fetchMock.mockResolvedValue(
+        jsonResponse(404, { status: 404, title: 'Not Found', detail: '這張單子已經不在了。' }),
+      )
+      const store = useTasksStore()
+
+      await expect(store.fetchTask(ID)).resolves.toBeNull()
+    })
+
+    it('says why the docket could not be opened', async () => {
+      // Otherwise pressing 編輯 does nothing at all, and nothing is the one
+      // outcome a reader cannot tell apart from a broken button.
+      fetchMock.mockResolvedValue(
+        jsonResponse(404, { status: 404, title: 'Not Found', detail: '這張單子已經不在了。' }),
+      )
+      const store = useTasksStore()
+
+      await store.fetchTask(ID)
+
+      expect(store.error).toBe('這張單子已經不在了。')
     })
   })
 })

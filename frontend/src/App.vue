@@ -13,7 +13,7 @@ import { TASK_RACKS } from '@/const/task'
 import type { TaskRack } from '@/const/task'
 import MainLayout from '@/layouts/MainLayout/index.vue'
 import { useTasksStore } from '@/stores/tasks'
-import type { Task } from '@/types/task'
+import type { TaskSummary } from '@/types/task'
 
 /**
  * The board's tasks, and how the load that fetched them went.
@@ -69,7 +69,7 @@ function reload(): void {
  * @param rack - The shelf being drawn.
  * @returns The tasks in that completion state, in board order.
  */
-function tasksFor(rack: TaskRack): Task[] {
+function tasksFor(rack: TaskRack): TaskSummary[] {
   return tasks.value.filter((task) => task.completed === rack.completed)
 }
 
@@ -95,13 +95,31 @@ function openCreate(): void {
  *
  * Wired to the row menu's 編輯, which is the only entrance to it: the card's
  * three-dot button opens the panel, and the panel is what says which of its two
- * entries was chosen. The tray attaches the task on the way up, so the board
+ * entries was chosen. The tray attaches the row on the way up, so the board
  * never works out which docket was pressed.
  *
- * @param task - The task whose docket was asked about.
+ * The row is not enough to open the sheet on. The list endpoint answers without
+ * `description`, so the whole task is fetched first — a sheet opened on the row
+ * alone would show an empty 說明 and save that emptiness over detail its reader
+ * was never shown.
+ *
+ * Nothing is drawn while that request runs, and nothing else is disabled: it is
+ * one small task from a server that has already answered once, and a spinner
+ * that appears and vanishes within a frame is worse than none. A second press
+ * simply opens the sheet twice on the same task.
+ *
+ * @param task - The row whose docket was asked about.
+ * @returns Resolves once the sheet is up, or once the store has recorded why
+ *   it is not.
  */
-function openEdit(task: Task): void {
-  taskDialogEl.value?.open('edit', task)
+async function openEdit(task: TaskSummary): Promise<void> {
+  const detail = await tasksStore.fetchTask(task.id)
+
+  // Guarded rather than opened regardless: a failed fetch hands back nothing,
+  // and the notice above says why — an empty sheet would say nothing at all.
+  if (detail) {
+    taskDialogEl.value?.open('edit', detail)
+  }
 }
 
 /**

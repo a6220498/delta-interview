@@ -4,6 +4,7 @@ import com.delta.interview.api.TasksApi;
 import com.delta.interview.api.model.CreateTaskRequest;
 import com.delta.interview.api.model.Task;
 import com.delta.interview.api.model.TaskCompletionRequest;
+import com.delta.interview.api.model.TaskSummary;
 import com.delta.interview.api.model.UpdateTaskRequest;
 import java.net.URI;
 import java.util.List;
@@ -31,8 +32,9 @@ public class TaskController implements TasksApi {
     }
 
     @Override
-    public ResponseEntity<List<Task>> listTasks(@Nullable Boolean completed) {
-        return ResponseEntity.ok(tasks.findAll(completed));
+    public ResponseEntity<List<TaskSummary>> listTasks(@Nullable Boolean completed) {
+        return ResponseEntity.ok(
+                tasks.findAll(completed).stream().map(TaskController::summarise).toList());
     }
 
     @Override
@@ -71,5 +73,35 @@ public class TaskController implements TasksApi {
     public ResponseEntity<Void> deleteTask(UUID id) {
         tasks.delete(id);
         return ResponseEntity.noContent().build();
+    }
+
+    /**
+     * Narrows a stored task to the fields the board's shelves are drawn from.
+     *
+     * <p>Mapped here rather than in the repository: which fields a response
+     * carries is a contract decision, while the repository's job is to hold
+     * whole tasks — a store that only ever handed back summaries would have
+     * nothing left to answer {@code GET /api/tasks/{id}} with.
+     *
+     * <p>Copied field by field rather than by a mapping library, because there
+     * is exactly one mapping in this application and a library to perform it
+     * would be more machinery than the six lines it replaces. A field the
+     * contract later makes required arrives in the constructor and stops this
+     * line compiling, which is the point at which someone decides whether the
+     * board needs it.
+     *
+     * @param task - the stored task, detail and all.
+     * @return the same task without its description.
+     */
+    private static TaskSummary summarise(Task task) {
+        return new TaskSummary(
+                        task.getId(),
+                        task.getCategory(),
+                        task.getSequence(),
+                        task.getTitle(),
+                        task.getCompleted(),
+                        task.getCreatedAt(),
+                        task.getUpdatedAt())
+                .dueDate(task.getDueDate());
     }
 }
