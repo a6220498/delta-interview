@@ -1,6 +1,12 @@
 <script setup lang="ts">
+import Header from '@/components/Header.vue'
+import MainLayout from '@/layouts/MainLayout.vue'
 </script>
 
 <template>
-  <div class="mx-auto flex min-h-dvh w-full max-w-2xl flex-col gap-4 p-4" />
+  <MainLayout>
+    <template #header>
+      <Header />
+    </template>
+  </MainLayout>
 </template>
