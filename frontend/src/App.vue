@@ -1,27 +1,62 @@
 <script setup lang="ts">
-import { ref, useTemplateRef } from 'vue'
+import { storeToRefs } from 'pinia'
+import { onMounted, useTemplateRef } from 'vue'
 
 import DeleteDialog from '@/components/DeleteDialog/index.vue'
 import type { DeleteDialogExposed } from '@/components/DeleteDialog/types'
 import Header from '@/components/Header/index.vue'
+import LoadFailure from '@/components/LoadFailure/index.vue'
 import TaskDialog from '@/components/TaskDialog/index.vue'
 import type { TaskDialogExposed } from '@/components/TaskDialog/types'
 import TaskList from '@/components/TaskList/index.vue'
 import { TASK_RACKS } from '@/const/task'
 import type { TaskRack } from '@/const/task'
 import MainLayout from '@/layouts/MainLayout/index.vue'
+import { useTasksStore } from '@/stores/tasks'
 import type { Task } from '@/types/task'
 
 /**
- * The tasks on the board.
+ * The board's tasks, and how the load that fetched them went.
  *
- * A local ref rather than a server-backed store: fetching, optimistic updates
- * and rollback are their own step, and this is the seam that step replaces.
- * Empty until then, so both trays currently draw their empty notice — and the
- * trays' `toggle` event is deliberately left unhandled, since there is nothing
- * here that could carry it anywhere.
+ * The store rather than a local ref, because the list is not the board's
+ * private business: the sheet, the confirmation and the completion stamp all
+ * write to the same tasks, and handing an array plus a set of mutators down
+ * through the trays is how two components end up disagreeing about what is on
+ * the shelf.
+ *
+ * `storeToRefs` rather than reading `tasksStore.tasks` in the template: it
+ * keeps the reactivity that plain destructuring would drop, without the board
+ * having to name the store on every line.
+ *
+ * The trays' `toggle` and `delete` are still unhandled — writing back is its
+ * own step; this one only fills the board.
  */
-const tasks = ref<Task[]>([])
+const tasksStore = useTasksStore()
+const { tasks, loading, error } = storeToRefs(tasksStore)
+
+/**
+ * Fills the board on first paint.
+ *
+ * In `onMounted` rather than at setup time so the request is made once, by the
+ * browser, rather than also on a server render. Nothing awaits it and nothing
+ * catches it on purpose: the store records a failure in `error` instead of
+ * throwing, and the notice below is what the reader gets.
+ */
+onMounted(() => {
+  void tasksStore.fetchTasks()
+})
+
+/**
+ * Runs the load again, behind the failure notice's 重試.
+ *
+ * Its own function rather than `@click="tasksStore.fetchTasks"`: handed the
+ * action by name, the click's `MouseEvent` would arrive where the filter goes.
+ *
+ * @returns Nothing; the outcome lands in the store, not here.
+ */
+function reload(): void {
+  void tasksStore.fetchTasks()
+}
 
 /**
  * The tasks belonging on one shelf.
@@ -132,12 +167,29 @@ function onSubmit(): void {
       reason: the confirmation below is what it will reach, and that is the next
       step rather than this one.
     -->
+    <!--
+      The failure notice sits above the shelves rather than replacing them: a
+      refresh that fails leaves the last good board on screen, and clearing it
+      would hide work the server still holds.
+
+      The gap below it is set here rather than inside the notice, because where
+      it sits relative to the racks is the board's arrangement and not the
+      notice's; the class falls through onto its root.
+    -->
+    <LoadFailure
+      v-if="error"
+      :reason="error"
+      class="mb-[14px]"
+      @retry="reload"
+    />
+
     <div class="grid grid-cols-2 items-start gap-[14px] max-[880px]:grid-cols-1">
       <TaskList
         v-for="rack in TASK_RACKS"
         :key="rack.id"
         :rack="rack"
         :tasks="tasksFor(rack)"
+        :loading="loading"
         @edit="openEdit"
       />
     </div>

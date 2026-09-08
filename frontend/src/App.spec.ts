@@ -2,12 +2,28 @@ import DeleteDialog from '@/components/DeleteDialog/index.vue'
 import TaskDialog from '@/components/TaskDialog/index.vue'
 import TaskList from '@/components/TaskList/index.vue'
 import type { Task } from '@/types/task'
-import { mount } from '@vue/test-utils'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { flushPromises, mount } from '@vue/test-utils'
+import { createPinia } from 'pinia'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { nextTick } from 'vue'
 
 import App from './App.vue'
 import MainLayout from './layouts/MainLayout/index.vue'
+
+const fetchMock = vi.fn<typeof fetch>()
+
+/** Builds a `fetch` Response double with the given status and JSON body. */
+function jsonResponse(status: number, body: unknown): Response {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { 'Content-Type': 'application/json' },
+  })
+}
+
+/** Returns the URL passed to the most recent `fetch` call. */
+function lastUrl(): string {
+  return String(fetchMock.mock.calls.at(-1)?.[0])
+}
 
 /**
  * jsdom 30 ships `<dialog>` as an element but almost none of its behaviour, so
@@ -16,6 +32,12 @@ import MainLayout from './layouts/MainLayout/index.vue'
  * which tests what the sheet does with them.
  */
 beforeEach(() => {
+  // The board loads itself on mount now, so every test needs a server to
+  // answer; an empty board is the default and the tests that care say so.
+  vi.stubGlobal('fetch', fetchMock)
+  fetchMock.mockReset()
+  fetchMock.mockResolvedValue(jsonResponse(200, []))
+
   HTMLDialogElement.prototype.showModal = function showModal(this: HTMLDialogElement): void {
     this.open = true
   }
@@ -47,9 +69,15 @@ function task(overrides: Partial<Task> = {}): Task {
   }
 }
 
-/** Mounts the whole board. */
+/**
+ * Mounts the whole board on a store of its own.
+ *
+ * A fresh pinia per mount rather than one shared across the file: Pinia keeps
+ * a store instance per pinia, and a list loaded in one test would otherwise
+ * still be on the board in the next one.
+ */
 function mountBoard() {
-  return mount(App)
+  return mount(App, { global: { plugins: [createPinia()] } })
 }
 
 type Board = ReturnType<typeof mountBoard>
@@ -102,15 +130,95 @@ describe('App', () => {
     ])
   })
 
-  it('gives each rack only the tasks that belong on it', () => {
-    // Vacuously true while the board has no data source, but it is the rule
-    // that has to survive the store landing: no task on both shelves, none
-    // missing from both.
+  it('gives each rack only the tasks that belong on it', async () => {
+    // The rule the store had to arrive without breaking: a loaded task lands on
+    // exactly one shelf — none on both, none missing from both.
+    fetchMock.mockResolvedValue(
+      jsonResponse(200, [task({ id: 'a' }), task({ id: 'b', completed: true })]),
+    )
     const wrapper = mountBoard()
+    await flushPromises()
+
     const [open, done] = wrapper.findAllComponents(TaskList)
 
-    expect(open?.props('tasks').every((task) => !task.completed)).toBe(true)
-    expect(done?.props('tasks').every((task) => task.completed)).toBe(true)
+    expect(open?.props('tasks').map((filed) => filed.id)).toEqual(['a'])
+    expect(done?.props('tasks').map((filed) => filed.id)).toEqual(['b'])
+  })
+
+  describe('檢視任務', () => {
+    it('asks the server for the whole board as soon as it mounts', async () => {
+      // No `completed` parameter: the board hangs both shelves, so filtering
+      // server-side here would mean two round trips for one screen.
+      mountBoard()
+      await flushPromises()
+
+      expect(fetchMock).toHaveBeenCalledTimes(1)
+      expect(lastUrl()).toBe('/api/tasks')
+    })
+
+    it('draws the dockets it loaded', async () => {
+      // Through the rendered text rather than the props above, because the
+      // other half of the claim is that a loaded task reaches the card.
+      fetchMock.mockResolvedValue(jsonResponse(200, [task()]))
+      const wrapper = mountBoard()
+      await flushPromises()
+
+      expect(wrapper.get('main').text()).toContain('補上 CORS 設定')
+    })
+
+    it('tells the shelves the first load is still running', async () => {
+      // Otherwise both trays claim 架上沒有單子 for as long as the request takes,
+      // which invites someone to re-open a task they already have.
+      fetchMock.mockReturnValue(new Promise<Response>(() => {}))
+      const wrapper = mountBoard()
+      await nextTick()
+
+      expect(wrapper.findAllComponents(TaskList).map((tray) => tray.props('loading'))).toEqual([
+        true,
+        true,
+      ])
+    })
+
+    it('drops the loading flag once the board is back', async () => {
+      const wrapper = mountBoard()
+      await flushPromises()
+
+      expect(wrapper.findComponent(TaskList).props('loading')).toBe(false)
+    })
+
+    it('says why the board is empty when the load fails', async () => {
+      // The reason comes from the backend's problem detail: "沒載到" without it
+      // leaves the reader with nothing to act on.
+      fetchMock.mockResolvedValue(
+        jsonResponse(500, { status: 500, title: 'Server error', detail: '資料庫連線失敗。' }),
+      )
+      const wrapper = mountBoard()
+      await flushPromises()
+
+      expect(wrapper.get('[role="alert"]').text()).toContain('資料庫連線失敗。')
+    })
+
+    it('keeps no failure notice on a board that loaded', async () => {
+      const wrapper = mountBoard()
+      await flushPromises()
+
+      expect(wrapper.find('[role="alert"]').exists()).toBe(false)
+    })
+
+    it('runs the load again when 重試 is pressed, and takes the notice away', async () => {
+      // The whole point of the button: a backend that was down at first paint
+      // must not need a page reload once it is up.
+      fetchMock.mockResolvedValue(jsonResponse(503, { status: 503, title: 'Unavailable' }))
+      const wrapper = mountBoard()
+      await flushPromises()
+
+      fetchMock.mockResolvedValue(jsonResponse(200, [task()]))
+      await wrapper.get('[data-retry]').trigger('click')
+      await flushPromises()
+
+      expect(wrapper.find('[role="alert"]').exists()).toBe(false)
+      expect(wrapper.get('main').text()).toContain('補上 CORS 設定')
+    })
   })
 
   describe('工單彈窗', () => {

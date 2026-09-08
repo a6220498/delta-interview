@@ -29,7 +29,11 @@ const emit = defineEmits<TaskListEmits>()
     the one you see; the other three sides are the shallow tray-edge. min-h
     keeps an empty shelf from collapsing next to a full one.
   -->
-  <div class="flex min-h-[220px] flex-col border border-t-[3px] border-tray-edge border-t-ink bg-tray p-2.5">
+  <div
+    data-tray
+    :aria-busy="props.loading ? true : undefined"
+    class="flex min-h-[220px] flex-col border border-t-[3px] border-tray-edge border-t-ink bg-tray p-2.5"
+  >
     <div class="flex items-center gap-2 px-1 pt-0.5 pb-2.5">
       <!-- Preflight strips a heading's own size and weight, so both are stated. -->
       <h3 class="font-display text-[15px] font-semibold tracking-[0.1em] uppercase">
@@ -64,12 +68,18 @@ const emit = defineEmits<TaskListEmits>()
     <!--
       The empty notice replaces the list rather than sitting inside it, so an
       empty shelf is never announced as a list of one.
+
+      The same box carries the wait, so the tray keeps its height and nothing
+      below it moves when the tasks land. Which of the two it says is the only
+      difference: an empty shelf points at the next action, a shelf that has not
+      arrived must not — 新增工單 offered over tasks still in flight invites a
+      second copy of one the reader already has.
     -->
     <p
       v-if="props.tasks.length === 0"
       class="flex flex-1 items-center justify-center rounded-sm border border-dashed border-tray-edge px-2 py-[22px] text-center font-mono text-[11.5px] tracking-[0.06em] text-ink-2"
     >
-      {{ props.rack.empty }}
+      {{ props.loading ? '載入中 —— 正在取回架上的單子' : props.rack.empty }}
     </p>
 
     <!--

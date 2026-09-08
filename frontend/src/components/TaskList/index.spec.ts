@@ -126,6 +126,39 @@ describe('TaskList', () => {
     })
   })
 
+  describe('while the board is loading', () => {
+    it('says the shelf is still coming rather than that it is empty', () => {
+      // An empty shelf and a shelf that has not arrived are the same `tasks`
+      // prop; only this flag tells them apart, and pointing someone at 新增工單
+      // before the load lands invites a duplicate of a task they already have.
+      const wrapper = mount(TaskList, { props: { rack: rack('open'), tasks: [], loading: true } })
+
+      expect(wrapper.text()).toContain('載入中')
+      expect(wrapper.text()).not.toContain('架上沒有單子')
+    })
+
+    it('marks the tray busy, so the notice is announced as a wait and not as a fact', () => {
+      const wrapper = mount(TaskList, { props: { rack: rack('open'), tasks: [], loading: true } })
+
+      expect(wrapper.get('[data-tray]').attributes('aria-busy')).toBe('true')
+    })
+
+    it('leaves the cards it already has in place while a refresh runs', () => {
+      // A refresh is not a first load: swapping loaded dockets for a notice
+      // would blank the board every time anything on it is saved.
+      const wrapper = mount(TaskList, { props: { rack: rack('open'), tasks: three, loading: true } })
+
+      expect(wrapper.findAllComponents(Card)).toHaveLength(3)
+      expect(wrapper.text()).not.toContain('載入中')
+    })
+
+    it('leaves the tray unmarked once the load is done', () => {
+      const wrapper = mountList([])
+
+      expect(wrapper.get('[data-tray]').attributes('aria-busy')).toBeUndefined()
+    })
+  })
+
   describe('forwarding', () => {
     it('passes a completion request up with the task it belongs to', async () => {
       // Deliberately not the first card: the list must attach the task the

@@ -19,6 +19,14 @@ export interface TaskListProps {
   rack: TaskRack
   /** The tasks to stack, already selected for this rack by the caller. */
   tasks: Task[]
+  /**
+   * Whether the board is still fetching.
+   *
+   * An empty shelf and a shelf that has not arrived are the same `tasks`, and
+   * only the caller knows which of the two it is handing over. Without this the
+   * tray would point someone at 新增工單 while their tasks were still in flight.
+   */
+  loading?: boolean
 }
 
 /**
