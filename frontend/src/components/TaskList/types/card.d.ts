@@ -27,9 +27,20 @@ export interface CardEmits {
    */
   toggle: [completed: boolean]
   /**
-   * The row menu was requested. The card does not open it: the menu renders in
-   * the top layer so it is not clipped by the tray, which makes its placement
-   * the board's business rather than the card's.
+   * 編輯 was chosen in the row menu.
+   *
+   * The card opens the menu but carries out neither of its entries: editing
+   * means the form sheet, which is one for the whole board rather than one per
+   * docket. What leaves here is the choice, not a task — the shelf above knows
+   * which card it rendered and attaches it there.
    */
-  menu: []
+  edit: []
+  /**
+   * 刪除 was chosen in the row menu.
+   *
+   * Reported the same way and for the same reason: what a delete costs is not
+   * the card's to know, and the confirmation that asks about it belongs to the
+   * board.
+   */
+  delete: []
 }

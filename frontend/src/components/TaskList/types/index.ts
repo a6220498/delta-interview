@@ -10,4 +10,5 @@
  * to an `import './card'` that the bundler could not resolve.
  */
 export type { CardEmits, CardProps } from './card'
+export type { RowMenuEmits, RowMenuProps } from './row-menu'
 export type { TaskListEmits, TaskListProps } from './task-list'

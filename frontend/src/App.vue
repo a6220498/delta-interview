@@ -58,10 +58,10 @@ function openCreate(): void {
 /**
  * Opens the sheet on an existing task, with its current values in the fields.
  *
- * Wired to the card's `menu` for now. The spec gives that button a popover with
- * 編輯 and 刪除 in it, and the 編輯 entry is what will own this call once the
- * menu exists; until then the button goes straight to the thing the menu's
- * first item does, rather than to nothing at all.
+ * Wired to the row menu's 編輯, which is the only entrance to it: the card's
+ * three-dot button opens the panel, and the panel is what says which of its two
+ * entries was chosen. The tray attaches the task on the way up, so the board
+ * never works out which docket was pressed.
  *
  * @param task - The task whose docket was asked about.
  */
@@ -78,11 +78,12 @@ function openEdit(task: Task): void {
  * heading colour and whose buttons all depend on which of the two it currently
  * is. They share the paper, not the component.
  *
- * Held but not yet raised: the card's 三點鈕 goes straight to the edit sheet for
- * now, and 刪除 is the second entry of the row menu that button is meant to
- * open. `deleteDialogEl.value?.open(task)` is what that entry will call — it is
- * left unwritten rather than written and unreachable, so the board carries no
- * line that nothing can run.
+ * Held but not yet raised. The row menu now exists and its 刪除 entry reports
+ * as it should, but the board deliberately does not listen for it yet: this is
+ * the step that builds the panel, not the one that deletes.
+ * `deleteDialogEl.value?.open(task)` is what that entry will reach, in the step
+ * that also has somewhere to delete the task from — left unwritten rather than
+ * written and unreachable, so the board carries no line nothing can run.
  */
 const deleteDialogEl = useTemplateRef<DeleteDialogExposed>('deleteDialogEl')
 
@@ -126,6 +127,10 @@ function onSubmit(): void {
       pair of trays no longer has the width to hold a docket's stub and title
       side by side. items-start lets a short tray keep its own height instead
       of stretching to match the taller one beside it.
+
+      The trays' `delete` is left unhandled next to their `toggle`, for the same
+      reason: the confirmation below is what it will reach, and that is the next
+      step rather than this one.
     -->
     <div class="grid grid-cols-2 items-start gap-[14px] max-[880px]:grid-cols-1">
       <TaskList
@@ -133,7 +138,7 @@ function onSubmit(): void {
         :key="rack.id"
         :rack="rack"
         :tasks="tasksFor(rack)"
-        @menu="openEdit"
+        @edit="openEdit"
       />
     </div>
   </MainLayout>

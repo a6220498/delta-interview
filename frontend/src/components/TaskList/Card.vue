@@ -3,9 +3,14 @@
  * One task, drawn as a paper docket: a perforated stub on the left carrying the
  * category mark and the number, the title and its two controls on the right.
  *
- * The card renders state and reports intent; it decides nothing. Completion and
- * the row menu leave as events, so the card never learns what finishing a task
- * costs or where the menu opens.
+ * The card renders state and reports intent; it decides nothing: completion,
+ * 編輯 and 刪除 all leave as events, so the card never learns what finishing a
+ * task costs or what becomes of a deleted one.
+ *
+ * The row menu is the one thing it does hold. The panel hangs from this card's
+ * own three-dot button, which makes whether it is up the card's fact rather
+ * than the board's — and it is rendered only while it is up, so a shelf of
+ * dockets carries no hidden panel apiece.
  *
  * Three states share this one template, and each differs in shape as well as in
  * colour — the board has to stay readable to someone who cannot tell the red
@@ -14,11 +19,12 @@
  * and stamps the card. Overdue is layered on open and disappears once stamped,
  * which is why `stub` tests `completed` first.
  */
-import { computed } from 'vue'
+import { computed, ref, useTemplateRef } from 'vue'
 
 import { categoryDisplay, displayNumber, formatDueDate, isOverdue } from '@/utils/task'
 
 import { LABELS } from './const'
+import RowMenu from './RowMenu.vue'
 import type { CardEmits, CardProps } from './types'
 
 const props = defineProps<CardProps>()
@@ -51,6 +57,57 @@ const stub = computed(() => {
 const markLabel = computed(
   () => `狀態：${stateLabel.value}，按下標記為${props.task.completed ? LABELS.open : LABELS.done}`,
 )
+
+/**
+ * The three-dot button, held so the menu can be hung from it.
+ *
+ * A ref rather than the click event's `currentTarget`, which is typed as a bare
+ * `EventTarget` and would have to be cast back to an element on every press —
+ * and which is only correct while the event is being dispatched.
+ */
+const menuButton = useTemplateRef<HTMLButtonElement>('menuButton')
+
+/** Whether this card's row menu is up, which is also whether it is rendered. */
+const menuOpen = ref(false)
+
+/**
+ * Whether the press that last took the menu away landed on this very button.
+ *
+ * Plain `let`, because nothing on the page is drawn from it. It is what makes
+ * the three-dot button a switch: the browser dismisses the panel on
+ * `pointerdown`, so the `click` that same press produces arrives at a card
+ * whose menu is already down and looks exactly like the press that opened it.
+ * The panel is the only thing that can tell those apart, and says which kind of
+ * dismissal it was on its way out.
+ *
+ * Read and cleared by the next press on the button. A press that never becomes
+ * a click — held down, dragged off the button, released elsewhere — leaves it
+ * set and costs that one button a single press.
+ */
+let dismissedByButton = false
+
+/** Opens the menu, unless this press is the one that has just closed it. */
+function onMenuButton(): void {
+  const pressedAgain = dismissedByButton
+
+  dismissedByButton = false
+
+  if (pressedAgain) {
+    return
+  }
+
+  menuOpen.value = true
+}
+
+/**
+ * Takes the menu off the card.
+ *
+ * @param byButton - Whether the three-dot button is what dismissed it.
+ */
+function onMenuClose(byButton: boolean): void {
+  menuOpen.value = false
+  dismissedByButton = byButton
+}
 </script>
 
 <template>
@@ -157,12 +214,13 @@ const markLabel = computed(
 
     <!-- The card's only control besides the mark; everything else lives in the menu. -->
     <button
+      ref="menuButton"
       type="button"
       :aria-label="`${number} 的操作選單`"
       aria-haspopup="true"
       class="absolute top-1 right-1 grid size-[26px] cursor-pointer place-content-center gap-[3px] rounded-sm border-0 bg-transparent before:absolute before:-inset-[9px] before:content-[''] hover:bg-stamp-bg hover:text-stamp focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-stamp"
       :class="task.completed ? 'text-ink-2' : 'text-ink-3'"
-      @click="emit('menu')"
+      @click="onMenuButton"
     >
       <span
         v-for="dot in 3"
@@ -170,6 +228,24 @@ const markLabel = computed(
         class="block size-[3px] rounded-full bg-current"
       />
     </button>
+
+    <!--
+      Written inside the card and drawn outside it: a popover renders in the top
+      layer wherever it sits in the markup, so this is next to the button it
+      belongs to without being clipped by the tray around it.
+
+      `menuButton` is in the condition as well as in the prop because the panel
+      cannot be placed against a button that has not been rendered yet — and
+      because that is what tells the type checker the same thing.
+    -->
+    <RowMenu
+      v-if="menuOpen && menuButton"
+      :task="task"
+      :anchor="menuButton"
+      @close="onMenuClose"
+      @edit="emit('edit')"
+      @delete="emit('delete')"
+    />
 
     <!-- Decoration: the mark button already announces the card as 已完成. -->
     <span

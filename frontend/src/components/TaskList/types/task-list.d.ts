@@ -31,6 +31,8 @@ export interface TaskListProps {
 export interface TaskListEmits {
   /** A card asked to change completion state, carrying the task it belongs to. */
   toggle: [task: Task, completed: boolean]
-  /** A card asked for its row menu, carrying the task it belongs to. */
-  menu: [task: Task]
+  /** A card's 編輯 was chosen, carrying the task it belongs to. */
+  edit: [task: Task]
+  /** A card's 刪除 was chosen, carrying the task it belongs to. */
+  delete: [task: Task]
 }

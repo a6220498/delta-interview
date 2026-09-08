@@ -89,7 +89,8 @@ const emit = defineEmits<TaskListEmits>()
         <Card
           :task="task"
           @toggle="emit('toggle', task, $event)"
-          @menu="emit('menu', task)"
+          @edit="emit('edit', task)"
+          @delete="emit('delete', task)"
         />
       </li>
     </ul>

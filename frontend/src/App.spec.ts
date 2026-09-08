@@ -139,13 +139,14 @@ describe('App', () => {
     })
 
     it('opens an edit sheet on the task whose docket was asked about', async () => {
-      // The card names the task with the event; the board is what turns that
-      // into a sheet carrying the values to correct. Asserted through the sheet's
-      // own fields rather than through a prop, because there is no longer a prop
-      // to assert on — the task is handed over in the call that opens it.
+      // 編輯 is chosen in the card's own row menu; the tray attaches the task
+      // on the way up, and the board is what turns that into a sheet carrying
+      // the values to correct. Asserted through the sheet's own fields rather
+      // than through a prop, because there is no longer a prop to assert on —
+      // the task is handed over in the call that opens it.
       const wrapper = mountBoard()
 
-      wrapper.findComponent(TaskList).vm.$emit('menu', task())
+      wrapper.findComponent(TaskList).vm.$emit('edit', task())
       await nextTick()
 
       expect(sheetOf(wrapper).attributes('open')).toBeDefined()
@@ -162,7 +163,7 @@ describe('App', () => {
       // opened.
       const wrapper = mountBoard()
 
-      wrapper.findComponent(TaskList).vm.$emit('menu', task())
+      wrapper.findComponent(TaskList).vm.$emit('edit', task())
       await nextTick()
       wrapper.findComponent(MainLayout).vm.$emit('action')
       await nextTick()
@@ -206,10 +207,10 @@ describe('App', () => {
 
     it('closes the confirmation when it is answered', async () => {
       // Raised through the component's own `open()` rather than through the
-      // board, because nothing on the board reaches it yet: 刪除 arrives with
-      // the row menu the card's 三點鈕 is meant to open. What is under test is
-      // the other half of the wiring — that an answered question is taken away
-      // by the board rather than by the confirmation itself.
+      // board, because nothing on the board reaches it yet — see the test
+      // below. What is under test is the other half of the wiring: that an
+      // answered question is taken away by the board rather than by the
+      // confirmation itself.
       const wrapper = mountBoard()
       const confirmation = wrapper.findComponent(DeleteDialog)
 
@@ -218,6 +219,19 @@ describe('App', () => {
       expect(confirmOf(wrapper).attributes('open')).toBeDefined()
 
       confirmation.vm.$emit('confirm', task())
+      await nextTick()
+
+      expect(confirmOf(wrapper).attributes('open')).toBeUndefined()
+    })
+
+    it('leaves 刪除 unwired for now, so nothing on the board can raise it', async () => {
+      // Deliberate, and pinned so it is noticed when it changes: the row menu
+      // reports 刪除 as it should, and the board does not listen. The step that
+      // connects the two is the step that has somewhere to delete the task
+      // from.
+      const wrapper = mountBoard()
+
+      wrapper.findComponent(TaskList).vm.$emit('delete', task())
       await nextTick()
 
       expect(confirmOf(wrapper).attributes('open')).toBeUndefined()

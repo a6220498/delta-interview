@@ -137,12 +137,20 @@ describe('TaskList', () => {
       expect(wrapper.emitted('toggle')).toEqual([[readme, true]])
     })
 
-    it('passes a menu request up with the task it belongs to', async () => {
+    it('passes an edit request up with the task it belongs to', async () => {
       const wrapper = mountList(three)
 
-      await cardAt(wrapper, 2).vm.$emit('menu')
+      await cardAt(wrapper, 2).vm.$emit('edit')
 
-      expect(wrapper.emitted('menu')).toEqual([[skeleton]])
+      expect(wrapper.emitted('edit')).toEqual([[skeleton]])
+    })
+
+    it('passes a delete request up with the task it belongs to', async () => {
+      const wrapper = mountList(three)
+
+      await cardAt(wrapper, 0).vm.$emit('delete')
+
+      expect(wrapper.emitted('delete')).toEqual([[cors]])
     })
   })
 })
