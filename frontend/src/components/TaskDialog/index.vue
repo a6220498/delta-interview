@@ -17,11 +17,14 @@
  *
  * Opened and closed by calling it rather than by a prop, because the browser
  * closes it too and a fact with two owners goes out of step: see
- * `TaskDialogExposed` in `./types`. What the sheet does *not* decide is what
- * becomes of what was typed — it reports that and waits: see `submit`.
+ * `TaskDialogExposed` in `./types`. What is typed on it is filed from here as
+ * well: the sheet is the only thing that knows which docket it is on, so
+ * whether a save is a `POST` or a `PUT` is its own question to answer — and a
+ * refused one is reported on the paper the typing is still sitting on.
  */
 import { computed, nextTick, ref, shallowRef, useId, useTemplateRef } from 'vue'
 
+import { useTasksStore } from '@/stores/tasks'
 import type { Task, TaskCategory } from '@/types/task'
 import { categoryDisplay, displayNumber } from '@/utils/task'
 
@@ -33,7 +36,13 @@ import {
   MESSAGES,
   NEW_NUMBER,
 } from './const'
-import type { TaskDialogEmits, TaskDialogExposed, TaskDialogMode, TaskDialogOpen } from './types'
+import type {
+  TaskDialogEmits,
+  TaskDialogExposed,
+  TaskDialogMode,
+  TaskDialogOpen,
+  TaskDialogValues,
+} from './types'
 
 // [AI assisted 006] 這個元件一個 prop 都沒有，是使用者要求改用 defineExpose 的
 // open / close 之後的連帶決定：原本的 `open` 布林 prop 會變成第二個「彈窗開著沒有」的
@@ -41,6 +50,18 @@ import type { TaskDialogEmits, TaskDialogExposed, TaskDialogMode, TaskDialogOpen
 // 唯一事實來源改成 <dialog> 的 open 屬性，showModal() 前也因此要擋一次 —— 對已開啟的
 // dialog 呼叫會丟 InvalidStateError，而「開著時換成另一張單」是合理操作。
 const emit = defineEmits<TaskDialogEmits>()
+
+/**
+ * The tasks, and the two requests that file one.
+ *
+ * The store rather than an event handed up to the board: the sheet is the only
+ * thing that knows which docket it is on, so a board that saved on its behalf
+ * would have to keep a second copy of that to address the request with — and
+ * two owners of one fact are how a correction ends up filed as a new task.
+ * Nothing about the save needs the board either, since what comes back lands on
+ * the shelves through the same store the board draws from.
+ */
+const tasksStore = useTasksStore()
 
 /**
  * Prefix for this sheet's element ids.
@@ -73,6 +94,17 @@ const category = ref<TaskCategory>(DEFAULT_CATEGORY)
 const description = ref('')
 const dueDate = ref('')
 const titleError = ref('')
+
+/**
+ * Why the last save came back refused, or empty while none has.
+ *
+ * Held here rather than in the store's `error`, which is the board's: that one
+ * raises 工單載不出來 above the shelves with a 重試 beside it that reloads the
+ * list and would not resend this save — behind a modal that hides it either
+ * way. The reason belongs where the person who pressed 確定 is looking, which
+ * is the fields they typed.
+ */
+const submitError = ref('')
 
 const heading = computed(() => HEADINGS[mode.value])
 
@@ -107,6 +139,7 @@ function seed(): void {
   description.value = task?.description ?? ''
   dueDate.value = task?.dueDate ?? ''
   titleError.value = ''
+  submitError.value = ''
 }
 
 /**
@@ -160,17 +193,48 @@ function close(): void {
 defineExpose<TaskDialogExposed>({ open, close })
 
 /**
- * Validates the one required field and hands the values up.
+ * Whether a save is on the wire.
+ *
+ * A plain `let` rather than a ref, because nothing on the sheet draws it —
+ * one small request, and a spinner that appears and vanishes within a frame is
+ * worse than none.
+ */
+let saving = false
+
+/**
+ * Validates the one required field, then files what is on the sheet.
  *
  * The title is checked here rather than left to `required`, so the message
  * lands in the row kept for it under the field instead of in a browser bubble
  * that is styled by no one, disappears on its own and is not reliably announced.
  *
+ * Which request it becomes comes from the task the sheet was opened on and not
+ * from the values, which are the same four fields either way: a docket in hand
+ * is a correction, nothing in hand is a new one. Neither an `id` nor a
+ * `sequence` is minted here — both are the server's, so that no two clients can
+ * issue the same number — and what goes on the shelves is what came back.
+ *
  * An empty description or date is sent as `null`, not as `''`: both requests
  * replace the whole task, so an empty string would file a task whose deadline
  * is the empty string rather than one with no deadline.
+ *
+ * The sheet comes down only once the save has landed. A refusal leaves it up
+ * with the typing still in it and the reason printed above the buttons: 400s
+ * are exactly what this form can produce, and a sheet that had already closed
+ * would have thrown away both.
  */
-function onSubmit(): void {
+async function onSubmit(): Promise<void> {
+  // A guard rather than a disabled button: 確定 pressed twice on a slow
+  // connection would file the same docket twice, and the copy can only be taken
+  // back by deleting it.
+  if (saving) {
+    return
+  }
+
+  // Cleared before anything else: what is on the paper is about the previous
+  // attempt, and this is a new one whether or not it gets as far as the wire.
+  submitError.value = ''
+
   const trimmed = title.value.trim()
 
   if (!trimmed) {
@@ -181,12 +245,32 @@ function onSubmit(): void {
 
   titleError.value = ''
 
-  emit('submit', {
+  const values: TaskDialogValues = {
     title: trimmed,
     description: description.value.trim() || null,
     category: category.value,
     dueDate: dueDate.value || null,
-  })
+  }
+
+  saving = true
+
+  try {
+    const task = source.value
+
+    if (task) {
+      await tasksStore.updateTask(task.id, values)
+    } else {
+      await tasksStore.createTask(values)
+    }
+
+    close()
+  } catch (cause) {
+    // Not only `ApiError`: `fetch` itself rejects with a TypeError when the
+    // backend is not running, which is the likeliest failure in development.
+    submitError.value = cause instanceof Error ? cause.message : String(cause)
+  } finally {
+    saving = false
+  }
 }
 </script>
 
@@ -402,6 +486,34 @@ function onSubmit(): void {
           class="min-h-[17px] text-[11.5px] leading-[1.45] text-ink-3"
         />
       </div>
+
+      <!--
+        A refused save says so here rather than on the board. The sheet is
+        modal, so the store's own notice is behind it — and the reader is
+        looking at the fields they typed, which is where the reason belongs.
+
+        role="alert" because nothing was asked of the reader: 確定 was pressed
+        and the answer came back a refusal.
+
+        The one row on this sheet that does not hold its height while empty.
+        The four above it must, because a message appearing between fields
+        pushes the rest of the form out from under the reader; nothing sits
+        below this one but the buttons, and reserving a notice's worth of blank
+        paper on every sheet to spare them a shift is the worse trade.
+      -->
+      <p
+        v-if="submitError"
+        data-submit-error
+        role="alert"
+        class="rounded-sm border border-alert bg-alert-bg px-[11px] py-[9px]"
+      >
+        <strong class="block font-display text-[15px] tracking-[0.01em] text-alert">
+          {{ MESSAGES.saveFailed }}
+        </strong>
+
+        <!-- The server's own problem detail: 沒存進去 alone gives nothing to act on. -->
+        <span class="text-[12.5px] text-ink-2">{{ submitError }}</span>
+      </p>
 
       <!--
         The same 取消／確定 pair in both modes: what the sheet is doing is said

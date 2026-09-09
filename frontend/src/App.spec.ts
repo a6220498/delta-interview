@@ -109,6 +109,21 @@ function confirmOf(board: Board) {
   return board.findComponent(DeleteDialog).get('dialog')
 }
 
+/**
+ * Fills the sheet's one required field and presses 確定 on it.
+ *
+ * Driven through the sheet's own form rather than through an event, because
+ * there is no longer an event: the sheet files what is typed on it, so the only
+ * way in from out here is the way a person takes.
+ */
+async function submitSheet(board: Board, title = '補上 CORS 設定'): Promise<void> {
+  const sheet = board.findComponent(TaskDialog)
+
+  await sheet.get('[data-field="title"] input').setValue(title)
+  await sheet.get('form').trigger('submit')
+  await flushPromises()
+}
+
 describe('App', () => {
   it('mounts the masthead into the layout header landmark rather than the content area', () => {
     // The wiring is the thing under test: the layout exposes two insertion
@@ -328,24 +343,25 @@ describe('App', () => {
       expect(wrapper.get<HTMLInputElement>('[data-field="title"] input').element.value).toBe('')
     })
 
-    it('closes the sheet when it is submitted', async () => {
-      // Only closes it. Filing the task needs an `id` and a `sequence`, and the
-      // contract gives both to the server so that no two clients can issue the
-      // same number — so nothing is added to the board here.
+    it('draws a docket the sheet filed, without loading the board again', async () => {
+      // The seam, and the only part of a save that is the board's: nothing is
+      // bound between the two — the sheet files its own — so what puts the new
+      // docket on the shelf is the store they share.
       const wrapper = mountBoard()
+      await flushPromises()
 
       wrapper.findComponent(MainLayout).vm.$emit('action')
       await nextTick()
-      wrapper.findComponent(TaskDialog).vm.$emit('submit', {
-        title: '補上 CORS 設定',
-        description: null,
-        category: 1,
-        dueDate: null,
-      })
-      await nextTick()
 
+      fetchMock.mockResolvedValue(jsonResponse(201, detail({ id: 'new', title: '新的單子' })))
+      await submitSheet(wrapper, '新的單子')
+
+      expect(wrapper.get('main').text()).toContain('新的單子')
       expect(sheetOf(wrapper).attributes('open')).toBeUndefined()
-      expect(wrapper.findComponent(TaskList).props('tasks')).toEqual([])
+      // One load on mount and one POST, nothing more: the create response is
+      // the whole task, so refetching the board would be a second round trip to
+      // learn what the request has just returned.
+      expect(fetchMock).toHaveBeenCalledTimes(2)
     })
   })
 

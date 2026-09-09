@@ -28,8 +28,9 @@ import type { TaskSummary } from '@/types/task'
  * keeps the reactivity that plain destructuring would drop, without the board
  * having to name the store on every line.
  *
- * The trays' `toggle` and `delete` are still unhandled — writing back is its
- * own step; this one only fills the board.
+ * The trays' `toggle` and `delete` are still unhandled — each of those is its
+ * own step. The board fills its shelves and raises the sheet; what is typed on
+ * the sheet is filed by the sheet, through this same store.
  */
 const tasksStore = useTasksStore()
 const { taskList, loading, error } = storeToRefs(tasksStore)
@@ -82,10 +83,15 @@ function tasksFor(rack: TaskRack): TaskSummary[] {
  * opinion of what the sheet was doing — and asking for it by name is what keeps
  * the mode and its task together: `open('edit', …)` does not compile without
  * one, so a blank sheet cannot be opened carrying the last task edited.
+ *
+ * Raising it is all the board does with it. What is typed on the sheet is filed
+ * by the sheet: it is the one that knows which docket it is on, and a board
+ * saving on its behalf would have to keep a second copy of that fact to address
+ * the request with — which is one owner too many for it.
  */
 const taskDialogEl = useTemplateRef<TaskDialogExposed>('taskDialogEl')
 
-/** Opens a blank sheet. */
+/** Opens a blank sheet, on no task: what is filed from it will be a new one. */
 function openCreate(): void {
   taskDialogEl.value?.open('create')
 }
@@ -153,20 +159,6 @@ const deleteDialogEl = useTemplateRef<DeleteDialogExposed>('deleteDialogEl')
 function onConfirmDelete(): void {
   deleteDialogEl.value?.close()
 }
-
-/**
- * Closes a submitted sheet, and nothing else — for now.
- *
- * Writing the task is the same step as the store above, and the values arriving
- * here are deliberately dropped rather than filed into the local array: a
- * client-side task would have to mint an `id` and a `sequence`, and the contract
- * gives both to the server on purpose so that no two clients can issue the same
- * number. The sheet waits to be closed rather than closing itself precisely so
- * that this line can move below a save that might fail.
- */
-function onSubmit(): void {
-  taskDialogEl.value?.close()
-}
 </script>
 
 <template>
@@ -228,11 +220,11 @@ function onSubmit(): void {
     Left mounted while closed, so the browser can hand focus back to whichever
     control opened the sheet — that is `<dialog>`'s to do, and it can only do it
     while the element is still there.
+
+    Nothing is bound on it: it files its own save and closes itself once that
+    has landed, and its `close` is a report rather than a request.
   -->
-  <TaskDialog
-    ref="taskDialogEl"
-    @submit="onSubmit"
-  />
+  <TaskDialog ref="taskDialogEl" />
 
   <!--
     The confirmation, mounted beside the sheet and outside `MainLayout` for the

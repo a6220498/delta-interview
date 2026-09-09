@@ -48,13 +48,20 @@ export const DEFAULT_CATEGORY: TaskCategory = 1
 export const FIELD_LIMITS = { title: 200, description: 2000 } as const
 
 /**
- * Everything the hint rows under the fields can say.
+ * Everything the sheet's own message rows can say.
  *
- * One line so far. The other three rows stay empty and keep their height, which
- * is what they are for: a message appearing must not push the rest of the form
- * down and take the reader's place on it along with it.
+ * Two lines so far. The hint rows under the fields stay empty and keep their
+ * height, which is what they are for: a message appearing must not push the
+ * rest of the form down and take the reader's place on it along with it.
  */
 export const MESSAGES = {
   /** Shown under 標題 when 確定 is pressed with nothing in it. */
   titleRequired: '標題不能空白。',
+  /**
+   * Heads the notice above the buttons when a save came back refused.
+   *
+   * `docs/ui-spec.html` 節 02「失敗 / Failed」: it says what happened rather
+   * than apologising, and the server's own reason is printed underneath it.
+   */
+  saveFailed: '這張單子沒存進去',
 }

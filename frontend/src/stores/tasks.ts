@@ -1,5 +1,11 @@
-import { getTask, listTasks } from '@/api/tasks'
-import type { Task, TaskFilter, TaskSummary } from '@/types/task'
+import { createTask as postTask, getTask, listTasks, updateTask as putTask } from '@/api/tasks'
+import type {
+  CreateTaskRequest,
+  Task,
+  TaskFilter,
+  TaskSummary,
+  UpdateTaskRequest,
+} from '@/types/task'
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 
@@ -115,5 +121,69 @@ export const useTasksStore = defineStore('tasks', () => {
     }
   }
 
-  return { taskList, loading, error, fetchTasks, fetchTask }
+  /**
+   * Opens a new task through the contract's `POST /api/tasks` and files it.
+   *
+   * What lands on the shelf is the server's answer, not the values that were
+   * typed: the `id`, the `sequence` and both timestamps are the server's to
+   * assign — that is the whole reason the sheet does not mint a number — so a
+   * row built here would be a guess at four fields until the next refresh.
+   *
+   * Filed at the front because the contract lists tasks newest first and this
+   * one is the newest there is. Cheaper than refetching the board, which would
+   * cost a second round trip to learn what this request just returned.
+   *
+   * Reports failure by throwing, which is the opposite of {@link fetchTasks}
+   * and deliberate. A load nobody asked for has nowhere to be reported but the
+   * board; a save was asked for by someone still looking at the sheet they
+   * pressed 確定 on, and that sheet — which the caller holds and this store does
+   * not — is where the reason belongs. Putting it in {@link error} instead
+   * would raise 工單載不出來 over a board that loaded perfectly well, behind a
+   * modal that hides it.
+   *
+   * @param input - The values the sheet collected.
+   * @returns The created task, as the server filed it.
+   * @throws {ApiError} 400 when the values fail the contract's validation.
+   */
+  async function createTask(input: CreateTaskRequest): Promise<Task> {
+    const created = await postTask(input)
+
+    // The whole task goes in where a row is expected: `Task` is a `TaskSummary`
+    // plus its detail, so the extra field is invisible to everything typed
+    // against the list, and stripping it would mean keeping a second copy of
+    // the contract's field list here just to throw one away.
+    taskList.value = [created, ...taskList.value]
+
+    return created
+  }
+
+  /**
+   * Replaces a task's editable fields through `PUT /api/tasks/{id}`.
+   *
+   * The stored row is swapped for the server's answer rather than patched field
+   * by field, because the response is not always the request: moving a task to
+   * the other category re-issues its `sequence` from that category's counter,
+   * and the new number is only in what came back.
+   *
+   * Left where it was in the list. The order is `createdAt` descending and an
+   * edit does not change when a task was created; the shelf it hangs on cannot
+   * move either, since completion belongs to its own endpoint and is not part
+   * of this payload.
+   *
+   * Throws on failure, for the reason {@link createTask} gives.
+   *
+   * @param id - The task to replace.
+   * @param input - The replacement values.
+   * @returns The updated task, as the server filed it.
+   * @throws {ApiError} 400 on validation failure, 404 when the task is gone.
+   */
+  async function updateTask(id: string, input: UpdateTaskRequest): Promise<Task> {
+    const updated = await putTask(id, input)
+
+    taskList.value = taskList.value.map((filed) => (filed.id === id ? updated : filed))
+
+    return updated
+  }
+
+  return { taskList, loading, error, fetchTasks, fetchTask, createTask, updateTask }
 })

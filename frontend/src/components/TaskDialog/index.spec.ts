@@ -1,9 +1,20 @@
 import type { Task } from '@/types/task'
-import { enableAutoUnmount, mount } from '@vue/test-utils'
+import { enableAutoUnmount, flushPromises, mount } from '@vue/test-utils'
+import { createPinia, setActivePinia } from 'pinia'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { defineComponent, h, nextTick } from 'vue'
 
 import TaskDialog from './index.vue'
+
+const fetchMock = vi.fn<typeof fetch>()
+
+/** Builds a `fetch` Response double with the given status and JSON body. */
+function jsonResponse(status: number, body: unknown): Response {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { 'Content-Type': 'application/json' },
+  })
+}
 
 /**
  * jsdom 30 ships `<dialog>` as an element but almost none of its behaviour:
@@ -18,6 +29,15 @@ import TaskDialog from './index.vue'
  * the component uses a native dialog instead of building its own.
  */
 beforeEach(() => {
+  // The sheet files its own save, so a submit needs both somewhere to file into
+  // and a server to answer. A fresh pinia per test, because Pinia keeps one
+  // store instance per pinia: a task filed in one test would otherwise still be
+  // on the list in the next.
+  setActivePinia(createPinia())
+  vi.stubGlobal('fetch', fetchMock)
+  fetchMock.mockReset()
+  fetchMock.mockResolvedValue(jsonResponse(201, task()))
+
   HTMLDialogElement.prototype.showModal = function showModal(this: HTMLDialogElement): void {
     this.open = true
   }
@@ -79,6 +99,27 @@ async function mountEdit(source: Task = task()) {
   await nextTick()
 
   return wrapper
+}
+
+/** The URL the most recent request went to. */
+function lastUrl(): string {
+  return String(fetchMock.mock.calls.at(-1)?.[0])
+}
+
+/** The options the most recent request was sent with. */
+function lastInit(): RequestInit {
+  return fetchMock.mock.calls.at(-1)?.[1] ?? {}
+}
+
+/** The JSON body the most recent request carried. */
+function lastBody(): unknown {
+  return JSON.parse(String(lastInit().body))
+}
+
+/** Presses 確定 and waits for whatever that put on the wire to come back. */
+async function save(wrapper: ReturnType<typeof mountSheet>): Promise<void> {
+  await wrapper.get('form').trigger('submit')
+  await flushPromises()
 }
 
 /** The value currently in one of the four fields. */
@@ -202,25 +243,21 @@ describe('TaskDialog', () => {
   })
 
   describe('送出', () => {
-    it('hands up exactly what the four fields hold', async () => {
+    it('sends exactly what the four fields hold', async () => {
       const wrapper = await mountCreate()
 
       await wrapper.get('[data-field="title"] input').setValue('  補上 CORS 設定  ')
       await wrapper.get('select').setValue(0)
       await wrapper.get('textarea').setValue('  前端在 5173  ')
       await wrapper.get('[data-field="due-date"] input').setValue('2026-09-30')
-      await wrapper.get('form').trigger('submit')
+      await save(wrapper)
 
-      expect(wrapper.emitted('submit')).toEqual([
-        [
-          {
-            title: '補上 CORS 設定',
-            description: '前端在 5173',
-            category: 0,
-            dueDate: '2026-09-30',
-          },
-        ],
-      ])
+      expect(lastBody()).toEqual({
+        title: '補上 CORS 設定',
+        description: '前端在 5173',
+        category: 0,
+        dueDate: '2026-09-30',
+      })
     })
 
     it('sends the empty optional fields as null rather than as empty strings', async () => {
@@ -229,21 +266,20 @@ describe('TaskDialog', () => {
       const wrapper = await mountCreate()
 
       await wrapper.get('[data-field="title"] input').setValue('沒有說明也沒有期限')
-      await wrapper.get('form').trigger('submit')
+      await save(wrapper)
 
-      expect(wrapper.emitted('submit')?.[0]?.[0]).toMatchObject({
-        description: null,
-        dueDate: null,
-      })
+      expect(lastBody()).toMatchObject({ description: null, dueDate: null })
     })
 
     it('refuses a blank title and says so in the row kept for it', async () => {
       const wrapper = await mountCreate()
 
       await wrapper.get('[data-field="title"] input').setValue('   ')
-      await wrapper.get('form').trigger('submit')
+      await save(wrapper)
 
-      expect(wrapper.emitted('submit')).toBeUndefined()
+      // Nothing reaches the wire for the server to refuse: the one required
+      // field is checked here, where the message has a row to land in.
+      expect(fetchMock).not.toHaveBeenCalled()
       expect(wrapper.get('[data-field="title"] span[aria-live]').text()).toBe('標題不能空白。')
     })
 
@@ -275,15 +311,192 @@ describe('TaskDialog', () => {
       expect(wrapper.get('[data-field="title"] span[aria-live]').text()).toBe('')
     })
 
-    it('stays up, so a rejected save does not take the typing with it', async () => {
-      // Closing is the owner's to do, once the write has landed.
+    it('stays up until the save has landed, and goes down once it has', async () => {
+      // Closing on submit would throw the typing away every time a save came
+      // back refused, which is exactly what this form can produce.
       const wrapper = await mountCreate()
+
+      let settle: (response: Response) => void = () => {}
+      fetchMock.mockReturnValue(
+        new Promise<Response>((resolve) => {
+          settle = resolve
+        }),
+      )
 
       await wrapper.get('[data-field="title"] input').setValue('補上 CORS 設定')
       await wrapper.get('form').trigger('submit')
 
-      expect(wrapper.emitted('close')).toBeUndefined()
       expect(wrapper.get('dialog').attributes('open')).toBeDefined()
+      expect(wrapper.emitted('close')).toBeUndefined()
+
+      settle(jsonResponse(201, task()))
+      await flushPromises()
+
+      expect(wrapper.get('dialog').attributes('open')).toBeUndefined()
+      expect(wrapper.emitted('close')).toHaveLength(1)
+    })
+  })
+
+  describe('存檔', () => {
+    it("files a blank sheet through the contract's create endpoint", async () => {
+      const wrapper = await mountCreate()
+
+      await wrapper.get('[data-field="title"] input').setValue('補上 CORS 設定')
+      await save(wrapper)
+
+      expect(lastUrl()).toBe('/api/tasks')
+      expect(lastInit().method).toBe('POST')
+    })
+
+    it('saves an open docket against its own id', async () => {
+      // Which of the two requests a save becomes is the sheet's own question to
+      // answer: it is the only thing that knows which docket it is on.
+      const wrapper = await mountEdit()
+
+      await save(wrapper)
+
+      expect(lastUrl()).toBe('/api/tasks/3f1a7c2e-9b04-4f5d-8a11-6c2d5e0f7b31')
+      expect(lastInit().method).toBe('PUT')
+    })
+
+    it('files a blank sheet opened after an edit as a new docket', async () => {
+      // One sheet does both jobs, so which request a save becomes cannot be
+      // left to whichever docket the sheet happened to be on last.
+      const wrapper = await mountEdit()
+
+      wrapper.vm.open('create')
+      await nextTick()
+
+      await wrapper.get('[data-field="title"] input').setValue('補上 CORS 設定')
+      await save(wrapper)
+
+      expect(lastUrl()).toBe('/api/tasks')
+      expect(lastInit().method).toBe('POST')
+    })
+
+    it('sends one request when 確定 is pressed twice', async () => {
+      // A second POST files the same docket twice, and the copy can only be
+      // taken back by deleting it — so the press is dropped rather than queued.
+      const wrapper = await mountCreate()
+
+      let settle: (response: Response) => void = () => {}
+      fetchMock.mockReturnValue(
+        new Promise<Response>((resolve) => {
+          settle = resolve
+        }),
+      )
+
+      await wrapper.get('[data-field="title"] input').setValue('補上 CORS 設定')
+      await wrapper.get('form').trigger('submit')
+      await wrapper.get('form').trigger('submit')
+
+      expect(fetchMock).toHaveBeenCalledTimes(1)
+
+      settle(jsonResponse(201, task()))
+      await flushPromises()
+    })
+  })
+
+  describe('存檔失敗', () => {
+    it('says nothing at all while nothing has failed', async () => {
+      const wrapper = await mountCreate()
+
+      expect(wrapper.find('[data-submit-error]').exists()).toBe(false)
+    })
+
+    it("prints the server's own reason under the fields it is about", async () => {
+      // 這張單子沒存進去 on its own gives nothing to act on: the problem detail
+      // is what says which of the four fields the server would not take.
+      const wrapper = await mountCreate()
+      fetchMock.mockResolvedValue(
+        jsonResponse(400, { status: 400, title: 'Bad Request', detail: '標題不能超過 200 個字。' }),
+      )
+
+      await wrapper.get('[data-field="title"] input').setValue('補上 CORS 設定')
+      await save(wrapper)
+
+      const notice = wrapper.get('[data-submit-error]')
+
+      expect(notice.text()).toContain('這張單子沒存進去')
+      expect(notice.text()).toContain('標題不能超過 200 個字。')
+      // Nothing was asked of the reader — 確定 was pressed and the answer came
+      // back a refusal — so it is announced rather than left to be noticed.
+      expect(notice.attributes('role')).toBe('alert')
+    })
+
+    it('says so even when the request never reached a server', async () => {
+      // `fetch` rejects outright when the backend is not running, which is the
+      // likeliest failure in development and carries no status to read. A 確定
+      // that appeared to do nothing cannot be told apart from a broken button.
+      const wrapper = await mountCreate()
+      fetchMock.mockRejectedValue(new TypeError('Failed to fetch'))
+
+      await wrapper.get('[data-field="title"] input').setValue('補上 CORS 設定')
+      await save(wrapper)
+
+      expect(wrapper.get('[data-submit-error]').text()).toContain('Failed to fetch')
+    })
+
+    it('stays up with the typing still in it', async () => {
+      // The whole reason the sheet does not close on submit: a refused save
+      // that took the form with it would take the writing too.
+      const wrapper = await mountCreate()
+      fetchMock.mockResolvedValue(jsonResponse(500, { status: 500, title: 'Server error' }))
+
+      await wrapper.get('[data-field="title"] input').setValue('補上 CORS 設定')
+      await save(wrapper)
+
+      expect(wrapper.get('dialog').attributes('open')).toBeDefined()
+      expect(valueOf(wrapper, 'title')).toBe('補上 CORS 設定')
+    })
+
+    it('lets 確定 be pressed again once a refusal has come back', async () => {
+      // The guard against a double press must not outlive the request it was
+      // guarding, or one refusal would leave the sheet unable to save at all.
+      const wrapper = await mountCreate()
+      fetchMock.mockResolvedValue(jsonResponse(500, { status: 500, title: 'Server error' }))
+
+      await wrapper.get('[data-field="title"] input').setValue('補上 CORS 設定')
+      await save(wrapper)
+
+      fetchMock.mockResolvedValue(jsonResponse(201, task()))
+      await save(wrapper)
+
+      expect(fetchMock).toHaveBeenCalledTimes(2)
+      expect(wrapper.get('dialog').attributes('open')).toBeUndefined()
+    })
+
+    it('takes the notice away as soon as another attempt starts', async () => {
+      // It describes the previous attempt; leaving it up beside a request that
+      // is on the wire would say the new one had failed too.
+      const wrapper = await mountCreate()
+      fetchMock.mockResolvedValue(jsonResponse(500, { status: 500, title: 'Server error' }))
+
+      await wrapper.get('[data-field="title"] input').setValue('補上 CORS 設定')
+      await save(wrapper)
+      expect(wrapper.find('[data-submit-error]').exists()).toBe(true)
+
+      // The second attempt is left in flight on purpose: one that landed would
+      // close the sheet, and a notice cannot be read off a sheet that is down.
+      fetchMock.mockReturnValue(new Promise<Response>(() => {}))
+      await wrapper.get('form').trigger('submit')
+
+      expect(wrapper.find('[data-submit-error]').exists()).toBe(false)
+    })
+
+    it('does not carry a refusal onto the next docket', async () => {
+      // One sheet serves every task, so a notice left standing would blame the
+      // next docket for what happened to the last one.
+      const wrapper = await mountCreate()
+      fetchMock.mockResolvedValue(jsonResponse(500, { status: 500, title: 'Server error' }))
+
+      await wrapper.get('[data-field="title"] input').setValue('補上 CORS 設定')
+      await save(wrapper)
+
+      wrapper.vm.open('edit', task())
+      await nextTick()
+
+      expect(wrapper.find('[data-submit-error]').exists()).toBe(false)
     })
   })
 

@@ -57,12 +57,12 @@ export interface TaskDialogExposed {
 }
 
 /**
- * What the sheet hands back when it is submitted.
+ * The four fields, as they go onto the wire.
  *
  * Typed as both request bodies at once rather than as a shape of its own: the
- * four fields are the same either way, and stating it against the contract
- * means a field added to `POST` or `PUT` breaks this component instead of being
- * quietly left out of the request the caller builds from it.
+ * four fields are the same either way — which is why one sheet does both jobs —
+ * and stating it against the contract means a field added to `POST` or `PUT`
+ * breaks this component instead of being quietly left out of the request.
  */
 export type TaskDialogValues = CreateTaskRequest & UpdateTaskRequest
 
@@ -75,25 +75,20 @@ export interface CategoryOption {
 }
 
 /**
- * What the sheet reports. It fills a form and decides nothing: neither event
- * carries out its own consequence.
+ * What the sheet reports.
+ *
+ * One event, and it asks nothing of anyone. There is no `submit` beside it
+ * because a save is not something the sheet needs done for it: it files what
+ * was typed itself, and a form that reported its values as well would be
+ * offering a second, unfiled copy of them.
  */
 export interface TaskDialogEmits {
   /**
-   * The form passed its own validation, carrying the values as typed.
-   *
-   * The sheet does not close itself on submit. Saving can fail — a 400 from the
-   * contract's validation, a dropped connection — and a sheet that has already
-   * closed has thrown away everything the person typed. Closing is the owner's
-   * to do, with `close()`, once the write has landed.
-   */
-  submit: [values: TaskDialogValues]
-  /**
-   * The sheet went down: 取消, Esc, or `close()`.
+   * The sheet went down: 取消, Esc, `close()`, or a save that landed.
    *
    * Reported for whoever wants to know, not asked of anyone — the sheet is
    * already closed by the time this fires, so nothing has to act on it. Every
-   * dismissal comes out here, including the owner's own `close()`, because the
+   * dismissal comes out here, including the sheet's own, because the
    * alternative is a hidden flag deciding which closes are worth mentioning.
    */
   close: []

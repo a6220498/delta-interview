@@ -1,4 +1,4 @@
-import type { Task, TaskSummary } from '@/types/task'
+import type { CreateTaskRequest, Task, TaskSummary, UpdateTaskRequest } from '@/types/task'
 import { createPinia, setActivePinia } from 'pinia'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -57,6 +57,35 @@ function detail(overrides: Partial<Task> = {}): Task {
 /** Returns the URL passed to the most recent `fetch` call. */
 function lastUrl(): string {
   return String(fetchMock.mock.calls.at(-1)?.[0])
+}
+
+/** Returns the options passed to the most recent `fetch` call. */
+function lastInit(): RequestInit {
+  return fetchMock.mock.calls.at(-1)?.[1] ?? {}
+}
+
+/** Returns the JSON body of the most recent `fetch` call. */
+function lastBody(): unknown {
+  return JSON.parse(String(lastInit().body))
+}
+
+/**
+ * The four fields the sheet hands up.
+ *
+ * Typed as both request bodies at once, exactly as the sheet types them: the
+ * payload is the same either way, and saying so here means a field added to
+ * only one of the two schemas fails this file rather than half the store.
+ */
+function values(
+  overrides: Partial<CreateTaskRequest> = {},
+): CreateTaskRequest & UpdateTaskRequest {
+  return {
+    title: '補上 CORS 設定',
+    description: '把 8080 的 CORS 設定補上，5173 才打得到。',
+    category: 1,
+    dueDate: null,
+    ...overrides,
+  }
 }
 
 beforeEach(() => {
@@ -245,6 +274,109 @@ describe('tasks store', () => {
       await store.fetchTask(ID)
 
       expect(store.error).toBe('這張單子已經不在了。')
+    })
+  })
+  describe('createTask', () => {
+    it("posts the sheet's values to the contract's create endpoint", async () => {
+      fetchMock.mockResolvedValue(jsonResponse(201, detail()))
+      const store = useTasksStore()
+
+      await store.createTask(values())
+
+      expect(lastUrl()).toBe('/api/tasks')
+      expect(lastInit().method).toBe('POST')
+      expect(lastBody()).toEqual(values())
+    })
+
+    it('files what the server answered rather than what was typed', async () => {
+      // The id and the serial are the server's to assign — that is why the
+      // sheet does not send one — so a row built from the payload would be a
+      // guess at both until the next refresh.
+      fetchMock.mockResolvedValue(jsonResponse(201, detail({ id: 'server-side', sequence: 9 })))
+      const store = useTasksStore()
+
+      await store.createTask(values())
+
+      expect(store.taskList.map((filed) => filed.id)).toEqual(['server-side'])
+      expect(store.taskList[0]?.sequence).toBe(9)
+    })
+
+    it('puts the new docket on top, where the list order says it belongs', async () => {
+      // The contract lists tasks newest first, and nothing is newer than one
+      // created a moment ago; filing it anywhere else would move it on the
+      // next refresh.
+      const store = useTasksStore()
+      fetchMock.mockResolvedValue(jsonResponse(200, [task({ id: 'older' })]))
+      await store.fetchTasks()
+
+      fetchMock.mockResolvedValue(jsonResponse(201, detail({ id: 'newest' })))
+      await store.createTask(values())
+
+      expect(store.taskList.map((filed) => filed.id)).toEqual(['newest', 'older'])
+    })
+
+    it('throws rather than turning a refused save into board state', async () => {
+      // Nothing about the board failed: someone pressed 確定 on a sheet that is
+      // still up, and the reason belongs on that sheet — which the caller holds
+      // and this store does not. In `error` it would raise 工單載不出來 over a
+      // board that loaded perfectly well.
+      fetchMock.mockResolvedValue(
+        jsonResponse(400, { status: 400, title: 'Bad Request', detail: '標題不能空白。' }),
+      )
+      const store = useTasksStore()
+
+      await expect(store.createTask(values())).rejects.toThrow('標題不能空白。')
+      expect(store.error).toBeNull()
+      expect(store.taskList).toEqual([])
+    })
+  })
+
+  describe('updateTask', () => {
+    const ID = '3f1a7c2e-9b04-4f5d-8a11-6c2d5e0f7b31'
+
+    it("puts the values to the docket's own endpoint", async () => {
+      fetchMock.mockResolvedValue(jsonResponse(200, detail()))
+      const store = useTasksStore()
+
+      await store.updateTask(ID, values())
+
+      expect(lastUrl()).toBe(`/api/tasks/${ID}`)
+      expect(lastInit().method).toBe('PUT')
+      expect(lastBody()).toEqual(values())
+    })
+
+    it('swaps the stored row for the answer, leaving it where it was', async () => {
+      // The response is not always the request: moving a task to the other
+      // category re-issues its serial, and the new number is only in what came
+      // back. The order is `createdAt` descending, which an edit cannot change.
+      const store = useTasksStore()
+      fetchMock.mockResolvedValue(jsonResponse(200, [task({ id: 'a' }), task({ id: 'b' })]))
+      await store.fetchTasks()
+
+      fetchMock.mockResolvedValue(
+        jsonResponse(200, detail({ id: 'b', title: '改過的標題', category: 1, sequence: 7 })),
+      )
+      await store.updateTask('b', values({ title: '改過的標題' }))
+
+      expect(store.taskList.map((filed) => filed.id)).toEqual(['a', 'b'])
+      expect(store.taskList[1]?.title).toBe('改過的標題')
+      expect(store.taskList[1]?.sequence).toBe(7)
+    })
+
+    it('leaves the board untouched when the save is refused', async () => {
+      // A save that did not happen has changed nothing, and a row rewritten
+      // here would claim otherwise until someone refreshed.
+      const store = useTasksStore()
+      fetchMock.mockResolvedValue(jsonResponse(200, [task({ id: 'a', title: '原本的標題' })]))
+      await store.fetchTasks()
+
+      fetchMock.mockResolvedValue(
+        jsonResponse(404, { status: 404, title: 'Not Found', detail: '這張單子已經不在了。' }),
+      )
+
+      await expect(store.updateTask('a', values())).rejects.toThrow('這張單子已經不在了。')
+      expect(store.taskList[0]?.title).toBe('原本的標題')
+      expect(store.error).toBeNull()
     })
   })
 })
