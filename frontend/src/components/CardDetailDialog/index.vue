@@ -1,8 +1,4 @@
 <script setup lang="ts">
-/**
- * The second copy: a docket pulled off the shelf to be read, never written. It opens
- * filled from the row it is handed and waits on one block — the 說明 the shelf never held.
- */
 import { computed, ref, shallowRef, useId, useTemplateRef } from 'vue'
 
 import { getTask } from '@/api/tasks'
@@ -174,10 +170,6 @@ function onClose(): void {
 </script>
 
 <template>
-  <!--
-    Wider than the form sheet (560 against 430): that one takes four fields, this is read.
-    `open:grid` not a flat `grid`, which would leave a closed window drawn on the board.
-  -->
   <dialog
     ref="detailDialogEl"
     tabindex="-1"
@@ -189,7 +181,6 @@ function onClose(): void {
     <div
       class="flex items-center gap-2.5 border-b border-dashed border-rule px-[17px] pt-[13px] pb-[11px]"
     >
-      <!-- Filled for bug, outlined for feature; the number beside it spells that out. -->
       <span
         data-category
         aria-hidden="true"
@@ -204,7 +195,6 @@ function onClose(): void {
         class="font-mono text-[10.5px] tracking-[0.12em] text-ink-3"
       >{{ number }}</span>
 
-      <!-- Preflight strips a heading's own size and weight, so both are stated. -->
       <h2
         :id="`${uid}-heading`"
         class="font-display text-[19px] font-semibold tracking-[0.02em]"
@@ -212,10 +202,6 @@ function onClose(): void {
         工單明細
       </h2>
 
-      <!--
-        Pressed into the heading rather than the paper's bottom-right corner, where
-        it would sit over the last line of the 說明. Decoration: 狀態 already says it.
-      -->
       <span
         v-if="completed"
         data-chop
@@ -226,9 +212,8 @@ function onClose(): void {
       </span>
     </div>
 
-    <!-- Head and foot are pinned; only this middle band scrolls — 說明 runs to 2000 字. -->
     <div class="grid content-start gap-[14px] overflow-auto px-[17px] pt-[15px] pb-[17px]">
-      <!-- anywhere wraps an unbroken string mid-word rather than widening the sheet. -->
+      <!-- title -->
       <p
         data-title
         class="font-display text-[22px] leading-[1.25] font-medium [overflow-wrap:anywhere]"
@@ -239,10 +224,6 @@ function onClose(): void {
         {{ title }}
       </p>
 
-      <!--
-        The rules are 1px gaps showing the box's own colour, not borders; flex-wrap not
-        grid, whose leftover track would draw an empty cell. Below 700px each cell folds.
-      -->
       <div
         class="flex flex-wrap gap-px rounded-sm border border-rule bg-rule max-[700px]:[&>div]:flex max-[700px]:[&>div]:flex-wrap max-[700px]:[&>div]:items-baseline max-[700px]:[&>div]:gap-x-2 max-[700px]:[&>div]:gap-y-[3px]"
       >
@@ -253,10 +234,6 @@ function onClose(): void {
         >
           <span class="font-mono text-[9.5px] tracking-[0.12em] text-ink-3 uppercase">狀態</span>
 
-          <!--
-            The card's mark, drawn but not wired: changing state is the card's job,
-            and a second entrance to it would be one more thing that can disagree.
-          -->
           <span
             class="inline-flex items-center gap-[7px] font-display text-[15px] text-ink max-[700px]:text-[14px]"
           >
@@ -290,10 +267,6 @@ function onClose(): void {
               {{ dueDate }}
             </span>
 
-            <!--
-              A real element rather than the spec's CSS `content`, which assistive
-              tech need not announce: being late costs the reader something.
-            -->
             <span
               v-if="overdue"
               class="border border-alert px-1 font-mono text-[9.5px] tracking-[0.08em] text-alert"
@@ -326,17 +299,12 @@ function onClose(): void {
       </div>
 
       <div>
-        <!-- The rule after the word is a pseudo-element: it is spacing, not content. -->
         <div
           class="mb-2 flex items-center gap-[9px] font-mono text-[11px] font-bold tracking-[0.12em] text-ink-2 uppercase after:flex-1 after:border-t after:border-rule after:content-['']"
         >
           說明
         </div>
 
-        <!--
-          aria-busy covers the block; the status row below it is what actually speaks.
-          Announcing the description itself would read out up to 2000 characters.
-        -->
         <div
           data-description
           :aria-busy="descriptionState === 'loading'"
@@ -356,10 +324,6 @@ function onClose(): void {
             />
           </template>
 
-          <!--
-            pre-wrap: the textarea that wrote this accepted newlines, so they are given
-            back. A docket with none gets the placeholder's italic, smaller, paler look.
-          -->
           <p
             v-else-if="descriptionState === 'ready'"
             data-description-text
@@ -369,10 +333,6 @@ function onClose(): void {
             {{ description || MESSAGES.noDescription }}
           </p>
 
-          <!--
-            role="alert" announces on arrival, which is right for a block that was
-            not there a moment ago — the opposite of the standing status row below.
-          -->
           <div
             v-else
             data-description-error
@@ -399,10 +359,6 @@ function onClose(): void {
           </div>
         </div>
 
-        <!--
-          Always in the DOM and only its text changing: a live region that arrives
-          with its own element is one many screen readers never announce.
-        -->
         <p
           data-description-status
           role="status"
@@ -430,10 +386,6 @@ function onClose(): void {
         >{{ source ? formatTimestamp(source.updatedAt) : '—' }}</b></span>
       </div>
 
-      <!--
-        One button, and it only closes. 編輯 and 刪除 stay in the row menu one Esc away:
-        putting them here would give one pair of actions two doors, and stack two modals.
-      -->
       <button
         type="button"
         data-close

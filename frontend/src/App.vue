@@ -18,19 +18,11 @@ import MainLayout from '@/layouts/MainLayout/index.vue'
 import { useTasksStore } from '@/stores/tasks'
 import type { TaskSummary } from '@/types/task'
 
-/**
- * The board's tasks, and how the load that fetched them went. `storeToRefs` keeps the
- * reactivity plain destructuring would drop. The trays report 編輯 and 刪除, nothing else.
- */
 const tasksStore = useTasksStore()
 const { taskList, loading, error } = storeToRefs(tasksStore)
 
-/**
- * Fills the board on first paint. Nothing awaits or catches it on purpose: the store
- * records a failure in `error`, and the notice below is what the reader gets.
- */
 onMounted(() => {
-  void tasksStore.fetchTasks()
+  tasksStore.fetchTasks()
 })
 
 /**
@@ -39,8 +31,8 @@ onMounted(() => {
  *
  * @returns Nothing; the outcome lands in the store, not here.
  */
-function reload(): void {
-  void tasksStore.fetchTasks()
+function reload(){
+  tasksStore.fetchTasks()
 }
 
 /**
@@ -56,11 +48,6 @@ function tasksFor(rack: TaskRack): TaskSummary[] {
 
 // [AI assisted 009] 手機版一次只看一架是使用者裁示的版型。哪一架在畫面上由這裡持有，
 // 但「另一架被藏起來」是 CSS 的事（max-[700px]:hidden）—— 寬螢幕兩架同時在，這個值就不管事。
-/**
- * The shelf on screen at phone widths, where the board shows one rack at a time.
- * The first rack rather than a literal id, so the table below stays the only place
- * the board's shelves are named.
- */
 const activeRackId = ref(TASK_RACKS[0]?.id ?? '')
 
 /**
@@ -73,10 +60,6 @@ const rackCounts = computed<Record<string, number>>(() =>
 
 // [AI assisted 008] 明細跟 openEdit 相反，不先 fetch 再開窗：卡片手上那一列已經畫得出
 // 六個欄位，只有說明要等，整窗一起等會讓五個已知欄位無謂地空著。
-/**
- * The read-only copy, held the same way as the two sheets below. The row goes straight
- * over unfetched: it draws the whole window but 說明, which the window fetches itself.
- */
 const cardDetailDialogEl = useTemplateRef<CardDetailDialogExposed>('cardDetailDialogEl')
 
 /**
@@ -84,7 +67,7 @@ const cardDetailDialogEl = useTemplateRef<CardDetailDialogExposed>('cardDetailDi
  *
  * @param task - The row whose card was pressed.
  */
-function openDetail(task: TaskSummary): void {
+function openDetail(task: TaskSummary) {
   cardDetailDialogEl.value?.open(task)
 }
 
@@ -95,7 +78,7 @@ function openDetail(task: TaskSummary): void {
 const taskDialogEl = useTemplateRef<TaskDialogExposed>('taskDialogEl')
 
 /** Opens a blank sheet, on no task: what is filed from it will be a new one. */
-function openCreate(): void {
+function openCreate() {
   taskDialogEl.value?.open('create')
 }
 
@@ -129,7 +112,7 @@ const deleteDialogEl = useTemplateRef<DeleteDialogExposed>('deleteDialogEl')
  *
  * @param task - The row whose 刪除 was pressed.
  */
-function openDelete(task: TaskSummary): void {
+function openDelete(task: TaskSummary) {
   deleteDialogEl.value?.open(task)
 }
 </script>
@@ -140,10 +123,6 @@ function openDelete(task: TaskSummary): void {
       <Header />
     </template>
 
-    <!--
-      The failure notice sits above the shelves rather than replacing them: a refresh
-      that fails leaves the last good board on screen. Its gap is the board's to set.
-    -->
     <LoadFailure
       v-if="error"
       :reason="error"
@@ -151,11 +130,7 @@ function openDelete(task: TaskSummary): void {
       @retry="reload"
     />
 
-    <!--
-      Draws itself only below 700px, where one shelf at a time is all that fits.
-      Above that it is display:none, and with it the choice it holds — both shelves
-      are on screen, so `activeRackId` decides nothing there.
-    -->
+    <!-- Rack Swich for small screen -->
     <RackSwitch
       v-model="activeRackId"
       :racks="TASK_RACKS"
@@ -165,7 +140,6 @@ function openDelete(task: TaskSummary): void {
     <!-- [AI assisted 010] items-start 換成滿高：卡片一多，托盤原本會一路往下長把整頁撐出
          捲軸。auto-rows 用 minmax(0,1fr) 是為了同時吃三種版型 —— 兩欄一列、一欄兩列，
          以及 700px 以下只剩一架時的一欄一列 —— 每一種都是把可用高度分完，不看內容。 -->
-
     <div
       class="grid min-h-0 flex-1 auto-rows-[minmax(0,1fr)] grid-cols-2 gap-[14px] max-[880px]:grid-cols-1"
     >
@@ -183,21 +157,9 @@ function openDelete(task: TaskSummary): void {
     </div>
   </MainLayout>
 
-  <!--
-    The read-only copy, mounted beside the two sheets for the same two reasons. It
-    fetches the one field the shelf never held and keeps any failure inside itself.
-  -->
   <CardDetailDialog ref="cardDetailDialogEl" />
 
-  <!--
-    One sheet for both jobs, opened by name and left mounted while closed so the
-    browser can hand focus back. Outside `MainLayout`: a modal renders in the top layer.
-  -->
   <TaskDialog ref="taskDialogEl" />
 
-  <!--
-    The confirmation, mounted beside the sheet for the same two reasons. Nothing is
-    bound on it either: it withdraws the docket it named and closes itself once it has.
-  -->
   <DeleteDialog ref="deleteDialogEl" />
 </template>

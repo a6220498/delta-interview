@@ -8,6 +8,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { nextTick } from 'vue'
 
 import Card from './Card.vue'
+import { SKELETON_CARDS } from './const'
 import TaskList from './index.vue'
 
 const fetchMock = vi.fn<typeof fetch>()
@@ -192,6 +193,36 @@ describe('TaskList', () => {
       const wrapper = mountList([])
 
       expect(wrapper.get('[data-tray]').attributes('aria-busy')).toBeUndefined()
+    })
+
+    it('draws a stack of docket-shaped placeholders rather than a spinner', () => {
+      // The whole point of the placeholders is that the stack already has its shape:
+      // a spinner occupies one line, so every card would shove the tray on arrival.
+      const wrapper = mount(TaskList, { props: { rack: rack('open'), tasks: [], loading: true } })
+
+      expect(wrapper.findAll('[data-skeleton]')).toHaveLength(SKELETON_CARDS)
+    })
+
+    it('keeps the placeholders out of the accessibility tree', () => {
+      // They hold no task and no control, so a shelf of them would be read out as
+      // several blank cards; the notice beside them is what carries the wait.
+      const wrapper = mount(TaskList, { props: { rack: rack('open'), tasks: [], loading: true } })
+
+      expect(wrapper.get('[data-skeleton]').attributes('aria-hidden')).toBe('true')
+    })
+
+    it('takes the placeholders down once the shelf has arrived', () => {
+      const wrapper = mountList(three)
+
+      expect(wrapper.findAll('[data-skeleton]')).toHaveLength(0)
+    })
+
+    it('draws no placeholders over cards a refresh is about to replace', () => {
+      // Same reasoning as the notice: a refresh is not a first load, and covering
+      // dockets that are still readable with placeholders loses what they said.
+      const wrapper = mount(TaskList, { props: { rack: rack('open'), tasks: three, loading: true } })
+
+      expect(wrapper.findAll('[data-skeleton]')).toHaveLength(0)
     })
   })
 

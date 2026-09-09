@@ -1,8 +1,4 @@
 <script setup lang="ts">
-/**
- * The delete confirmation: `TaskDialog`'s sheet with a red top rule and one question.
- * `role="alertdialog"`, focus on 取消, and it decides nothing — it reports and waits.
- */
 import { computed, nextTick, ref, shallowRef, useId, useTemplateRef } from 'vue'
 import { WRITE_THROTTLE_MS } from '@/const/interaction'
 import { useTasksStore } from '@/stores/tasks'
@@ -15,10 +11,6 @@ import type { DeleteDialogEmits, DeleteDialogExposed } from './types'
 
 const emit = defineEmits<DeleteDialogEmits>()
 
-/**
- * The tasks, and the request that withdraws one. The store rather than an answer handed
- * up to the board: this sheet is the only thing that knows which docket it is asking about.
- */
 const tasksStore = useTasksStore()
 
 /**
@@ -95,10 +87,6 @@ let deleting = false
 
 // [AI assisted 006] 確定不會馬上關窗：刪除可能失敗（404、斷線），關窗留到 DELETE
 // 回來之後才做。跟 TaskDialog 的存檔同一條規則。
-/**
- * Withdraws the docket the question names, then takes the question away. A refusal is
- * printed on the paper instead, which is why the sheet is still up to hold it.
- */
 async function withdraw(): Promise<void> {
   const task = target.value
 
@@ -131,10 +119,6 @@ const onConfirm = throttle(withdraw, WRITE_THROTTLE_MS)
 </script>
 
 <template>
-  <!--
-    m-auto restores the centring preflight zeroes; p-0 drops the UA's own padding.
-    Narrower than the form sheet and red along the top: one question, not four fields.
-  -->
   <dialog
     ref="deleteDialogEl"
     role="alertdialog"
@@ -162,10 +146,6 @@ const onConfirm = throttle(withdraw, WRITE_THROTTLE_MS)
     </div>
 
     <div class="grid gap-3 px-[17px] pt-[15px] pb-[17px]">
-      <!--
-        The title copied onto the paper. anywhere rather than truncation: a title
-        cut short might belong to a different docket than the one being deleted.
-      -->
       <p
         data-quote
         class="border-l-[3px] border-alert bg-alert-bg px-[11px] py-[9px] font-display text-[16.5px] text-ink [overflow-wrap:anywhere]"
@@ -173,10 +153,6 @@ const onConfirm = throttle(withdraw, WRITE_THROTTLE_MS)
         {{ title }}
       </p>
 
-      <!--
-        The dialog's description, so `alertdialog` reads it out on opening: what
-        happens, and that it cannot be taken back.
-      -->
       <p
         :id="`${uid}-warning`"
         class="text-[12.5px] text-ink-2"
@@ -184,10 +160,6 @@ const onConfirm = throttle(withdraw, WRITE_THROTTLE_MS)
         單子會從架上撤掉，這個動作無法復原。
       </p>
 
-      <!--
-        A refused delete says so here, on the question that is still up. The only row
-        that is not drawn while empty: nothing sits below it but the two buttons.
-      -->
       <p
         v-if="deleteError"
         data-delete-error
@@ -202,10 +174,6 @@ const onConfirm = throttle(withdraw, WRITE_THROTTLE_MS)
         <span class="text-[12.5px] text-ink-2">{{ deleteError }}</span>
       </p>
 
-      <!--
-        The same 取消／確定 pair as every other sheet: the stakes are carried by
-        the red rule and button, not by renaming 確定 to 刪除 on this one screen.
-      -->
       <div class="flex justify-end gap-[9px]">
         <button
           ref="cancelButton"

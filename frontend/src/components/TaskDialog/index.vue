@@ -1,8 +1,4 @@
 <script setup lang="ts">
-/**
- * The sheet: one blank docket, filled in to open a new job or correct a filed one.
- * One component for both, a native `<dialog>`, opened by calling it rather than by a prop.
- */
 import { computed, nextTick, ref, shallowRef, useId, useTemplateRef } from 'vue'
 
 import { WRITE_THROTTLE_MS } from '@/const/interaction'
@@ -30,10 +26,6 @@ import type {
 // 沒有」的主人，而瀏覽器自己就會關 dialog，遲早不同步。唯一事實來源是 <dialog>.open。
 const emit = defineEmits<TaskDialogEmits>()
 
-/**
- * The tasks, and the two requests that file one. The store rather than an event to
- * the board: only the sheet knows which docket it is on.
- */
 const tasksStore = useTasksStore()
 
 /**
@@ -83,8 +75,8 @@ const categories = computed(() =>
 )
 
 /**
- * Fills the fields from the task the sheet is opening on, or empties them. `??` not
- * `||`: the contract's `null` must land in the DOM as an empty string.
+ * if add task seed with null
+ * if edit task seed with task
  */
 function seed(): void {
   const task = source.value
@@ -206,10 +198,6 @@ const onSubmit = throttle(save, WRITE_THROTTLE_MS)
 </script>
 
 <template>
-  <!--
-    m-auto restores the centring preflight zeroes; p-0 drops the UA's own padding,
-    since the head and the form each carry theirs.
-  -->
   <dialog
     ref="taskDialogEl"
     :aria-labelledby="`${uid}-heading`"
@@ -234,10 +222,6 @@ const onSubmit = throttle(save, WRITE_THROTTLE_MS)
       </h2>
     </div>
 
-    <!--
-      novalidate hands validation to `onSubmit`, which puts its message in the
-      row below the field rather than in a browser bubble.
-    -->
     <form
       novalidate
       class="grid gap-[15px] px-[17px] pt-[15px] pb-[17px]"
@@ -251,19 +235,12 @@ const onSubmit = throttle(save, WRITE_THROTTLE_MS)
           :for="`${uid}-title`"
           class="font-mono text-[12.5px] font-bold tracking-[0.12em] text-ink-2 uppercase"
         >
-          標題<!--
-            The star is for people who can see the form; `required` on the input
-            carries the meaning, so a reader hears "必填", not "asterisk".
-          --><span
+          標題<span
             aria-hidden="true"
             class="ml-[3px] text-[14px] text-alert"
           >*</span>
         </label>
 
-        <!--
-          A line to write on, not a rounded box; the whole line reddens on failure.
-          Focus is bound alongside it, so a standing purple cannot win over the red.
-        -->
         <input
           :id="`${uid}-title`"
           ref="titleInput"
@@ -283,10 +260,6 @@ const onSubmit = throttle(save, WRITE_THROTTLE_MS)
           @input="titleError = ''"
         >
 
-        <!--
-          Holds its height while empty, so a message appearing cannot push the form
-          down. aria-live announces it without interrupting someone still typing.
-        -->
         <span
           :id="`${uid}-title-msg`"
           aria-live="polite"
@@ -311,10 +284,6 @@ const onSubmit = throttle(save, WRITE_THROTTLE_MS)
           >*</span>
         </label>
 
-        <!--
-          appearance-none takes the native arrow away with the box, so the wrapper
-          draws one back; without it this reads as the input above.
-        -->
         <span
           class="relative block after:pointer-events-none after:absolute after:top-[44%] after:right-[5px] after:size-[7px] after:-translate-y-1/2 after:rotate-45 after:border-r-[1.5px] after:border-b-[1.5px] after:border-ink-2 after:content-['']"
         >
@@ -353,10 +322,6 @@ const onSubmit = throttle(save, WRITE_THROTTLE_MS)
           說明
         </label>
 
-        <!--
-          Ruled paper rather than a single line, so the shape says this one may run
-          long. background-attachment:local scrolls the rules with the text.
-        -->
         <textarea
           :id="`${uid}-description`"
           v-model="description"

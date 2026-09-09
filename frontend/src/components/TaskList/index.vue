@@ -5,6 +5,8 @@ import { useTaskDrag } from '@/composables/useTaskDrag'
 import { useTasksStore } from '@/stores/tasks'
 
 import Card from './Card.vue'
+import CardSkeleton from './CardSkeleton.vue'
+import { LOADING_NOTICE, SKELETON_CARDS } from './const'
 import type { TaskListEmits, TaskListProps } from './types'
 
 const props = defineProps<TaskListProps>()
@@ -144,12 +146,28 @@ async function onDrop(event: DragEvent): Promise<void> {
       —— {{ dropError }}
     </p>
 
-    <!-- tray loading or empty tip -->
+    <template v-if="props.loading && props.tasks.length === 0">
+      <div
+        aria-hidden="true"
+        class="flex min-h-0 flex-1 flex-col gap-[9px] overflow-hidden"
+      >
+        <CardSkeleton
+          v-for="placeholder in SKELETON_CARDS"
+          :key="placeholder"
+        />
+      </div>
+
+      <p class="sr-only">
+        {{ LOADING_NOTICE }}
+      </p>
+    </template>
+
+    <!-- tray empty tip -->
     <p
-      v-if="props.tasks.length === 0"
+      v-else-if="props.tasks.length === 0"
       class="flex flex-1 items-center justify-center rounded-sm border border-dashed border-tray-edge px-2 py-[22px] text-center font-mono text-[11.5px] tracking-[0.06em] text-ink-2"
     >
-      {{ props.loading ? '載入中 —— 正在取回架上的單子' : props.rack.empty }}
+      {{ props.rack.empty }}
     </p>
     <!--
       [AI assisted 010] overflow-x 必須明寫 hidden。只寫 overflow-y-auto 的話，CSS 會把
