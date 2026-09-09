@@ -1,3 +1,4 @@
+import { WRITE_THROTTLE_MS } from '@/const/interaction'
 import type { Task, TaskSummary } from '@/types/task'
 import { enableAutoUnmount, flushPromises, mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
@@ -99,6 +100,16 @@ function lastBody(): unknown {
 async function stamp(wrapper: ReturnType<typeof mount<typeof Card>>): Promise<void> {
   await wrapper.get('[aria-pressed]').trigger('click')
   await flushPromises()
+}
+
+/**
+ * Moves the clock past the window the write buttons are throttled by, so a press this
+ * suite means as a fresh attempt is not taken for the second half of a double-click.
+ * Only `Date.now` is moved: faking the timers themselves would leave `flushPromises`,
+ * which waits on one, hanging on a clock nothing in the test advances.
+ */
+function passThrottleWindow(): void {
+  vi.spyOn(Date, 'now').mockReturnValue(Date.now() + WRITE_THROTTLE_MS)
 }
 
 /**
@@ -239,6 +250,18 @@ describe('Card', () => {
       expect(wrapper.get('[role="alert"]').text()).toContain('Failed to fetch')
     })
 
+    it('drops a press that comes in the same breath as the refusal', async () => {
+      // The in-flight guard comes down with the answer, so the second half of a
+      // double-click lands on a card that is ready to send the PATCH again.
+      fetchMock.mockRejectedValue(new TypeError('Failed to fetch'))
+      const wrapper = mount(Card, { props: { task: task() } })
+
+      await stamp(wrapper)
+      await stamp(wrapper)
+
+      expect(fetchMock).toHaveBeenCalledTimes(1)
+    })
+
     it('lets the mark be pressed again once a refusal has come back, and clears it', async () => {
       // The guard is released in a `finally`, or one failed stamp would leave the
       // docket unstampable until the page was reloaded.
@@ -246,6 +269,8 @@ describe('Card', () => {
       const wrapper = mount(Card, { props: { task: task() } })
       await stamp(wrapper)
 
+      // Pressed again deliberately, rather than twice in a breath.
+      passThrottleWindow()
       await stamp(wrapper)
 
       expect(fetchMock).toHaveBeenCalledTimes(2)

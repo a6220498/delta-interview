@@ -5,9 +5,10 @@
  */
 import { computed, nextTick, ref, shallowRef, useId, useTemplateRef } from 'vue'
 
+import { WRITE_THROTTLE_MS } from '@/const/interaction'
 import { useTasksStore } from '@/stores/tasks'
 import type { Task, TaskCategory } from '@/types/task'
-import { categoryDisplay, displayNumber } from '@/utils/task'
+import { categoryDisplay, displayNumber, throttle } from '@/utils'
 
 import {
   CATEGORY_OPTIONS,
@@ -150,7 +151,7 @@ let saving = false
  * Validates the one required field, then files what is on the sheet — a `PUT` when it
  * was opened on a docket, a `POST` otherwise. It comes down only once the save lands.
  */
-async function onSubmit(): Promise<void> {
+async function save(): Promise<void> {
   // A guard rather than a disabled button: 確定 pressed twice on a slow connection
   // would file the same docket twice, and the copy can only be taken back by deleting it.
   if (saving) {
@@ -197,6 +198,14 @@ async function onSubmit(): Promise<void> {
     saving = false
   }
 }
+
+/**
+ * What 確定 is wired to. The throttle covers the gap `saving` cannot: it is raised only
+ * once the validation above has passed, so two presses on a sheet with an empty 標題
+ * would otherwise both run, and a save that lands inside a repeat press would let the
+ * second one file a second docket.
+ */
+const onSubmit = throttle(save, WRITE_THROTTLE_MS)
 </script>
 
 <template>

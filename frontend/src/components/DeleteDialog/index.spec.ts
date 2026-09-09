@@ -1,3 +1,4 @@
+import { WRITE_THROTTLE_MS } from '@/const/interaction'
 import type { TaskSummary } from '@/types/task'
 import { enableAutoUnmount, flushPromises, mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
@@ -101,6 +102,16 @@ async function mountAsking(subject: TaskSummary = task()) {
 async function confirm(wrapper: ReturnType<typeof mountSheet>): Promise<void> {
   await wrapper.get('[data-confirm]').trigger('click')
   await flushPromises()
+}
+
+/**
+ * Moves the clock past the window the write buttons are throttled by, so a press this
+ * suite means as a fresh attempt is not taken for the second half of a double-click.
+ * Only `Date.now` is moved: faking the timers themselves would leave `flushPromises`,
+ * which waits on one, hanging on a clock nothing in the test advances.
+ */
+function passThrottleWindow(): void {
+  vi.spyOn(Date, 'now').mockReturnValue(Date.now() + WRITE_THROTTLE_MS)
 }
 
 describe('DeleteDialog', () => {
@@ -291,6 +302,18 @@ describe('DeleteDialog', () => {
       expect(wrapper.emitted('close')).toBeUndefined()
     })
 
+    it('drops a 確定 pressed in the same breath as the refusal', async () => {
+      // The in-flight guard comes down with the answer, so the second half of a
+      // double-click lands on a sheet that is ready to send the DELETE again.
+      fetchMock.mockRejectedValue(new TypeError('Failed to fetch'))
+      const wrapper = await mountAsking()
+
+      await confirm(wrapper)
+      await confirm(wrapper)
+
+      expect(fetchMock).toHaveBeenCalledTimes(1)
+    })
+
     it('lets 確定 be pressed again once a refusal has come back', async () => {
       // The guard is about one request being in flight, not about one question:
       // a delete refused by a hiccup has to be retryable without reopening.
@@ -298,6 +321,8 @@ describe('DeleteDialog', () => {
       const wrapper = await mountAsking()
       await confirm(wrapper)
 
+      // Pressed again deliberately, rather than twice in a breath.
+      passThrottleWindow()
       fetchMock.mockResolvedValue(noContent())
       await confirm(wrapper)
 

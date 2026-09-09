@@ -1,3 +1,4 @@
+import { WRITE_THROTTLE_MS } from '@/const/interaction'
 import type { Task } from '@/types/task'
 import { enableAutoUnmount, flushPromises, mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
@@ -108,6 +109,16 @@ function lastBody(): unknown {
 async function save(wrapper: ReturnType<typeof mountSheet>): Promise<void> {
   await wrapper.get('form').trigger('submit')
   await flushPromises()
+}
+
+/**
+ * Moves the clock past the window the write buttons are throttled by, so a press this
+ * suite means as a fresh attempt is not taken for the second half of a double-click.
+ * Only `Date.now` is moved: faking the timers themselves would leave `flushPromises`,
+ * which waits on one, hanging on a clock nothing in the test advances.
+ */
+function passThrottleWindow(): void {
+  vi.spyOn(Date, 'now').mockReturnValue(Date.now() + WRITE_THROTTLE_MS)
 }
 
 /** The value currently in one of the four fields. */
@@ -428,6 +439,19 @@ describe('TaskDialog', () => {
       expect(valueOf(wrapper, 'title')).toBe('補上 CORS 設定')
     })
 
+    it('drops a 確定 pressed in the same breath as the refusal', async () => {
+      // The in-flight guard comes down with the answer, so the second half of a
+      // double-click lands on a sheet that is ready to file the docket again.
+      const wrapper = await mountCreate()
+      fetchMock.mockResolvedValue(jsonResponse(500, { status: 500, title: 'Server error' }))
+
+      await wrapper.get('[data-field="title"] input').setValue('補上 CORS 設定')
+      await save(wrapper)
+      await save(wrapper)
+
+      expect(fetchMock).toHaveBeenCalledTimes(1)
+    })
+
     it('lets 確定 be pressed again once a refusal has come back', async () => {
       // The guard against a double press must not outlive the request it was
       // guarding, or one refusal would leave the sheet unable to save at all.
@@ -437,6 +461,8 @@ describe('TaskDialog', () => {
       await wrapper.get('[data-field="title"] input').setValue('補上 CORS 設定')
       await save(wrapper)
 
+      // Pressed again deliberately, rather than twice in a breath.
+      passThrottleWindow()
       fetchMock.mockResolvedValue(jsonResponse(201, task()))
       await save(wrapper)
 
@@ -456,6 +482,7 @@ describe('TaskDialog', () => {
 
       // The second attempt is left in flight on purpose: one that landed would
       // close the sheet, and a notice cannot be read off a sheet that is down.
+      passThrottleWindow()
       fetchMock.mockReturnValue(new Promise<Response>(() => {}))
       await wrapper.get('form').trigger('submit')
 

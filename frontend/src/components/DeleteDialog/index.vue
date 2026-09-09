@@ -4,8 +4,9 @@
  * `role="alertdialog"`, focus on 取消, and it decides nothing — it reports and waits.
  */
 import { computed, nextTick, ref, shallowRef, useId, useTemplateRef } from 'vue'
+import { WRITE_THROTTLE_MS } from '@/const/interaction'
 import { useTasksStore } from '@/stores/tasks'
-import { displayNumber } from '@/utils/task'
+import { displayNumber, throttle } from '@/utils'
 
 import type { TaskSummary } from '@/types/task'
 import type { DeleteDialogEmits, DeleteDialogExposed } from './types'
@@ -98,7 +99,7 @@ let deleting = false
  * Withdraws the docket the question names, then takes the question away. A refusal is
  * printed on the paper instead, which is why the sheet is still up to hold it.
  */
-async function onConfirm(): Promise<void> {
+async function withdraw(): Promise<void> {
   const task = target.value
 
   // A guard rather than a disabled button: a second 確定 sends a second DELETE, and
@@ -122,6 +123,13 @@ async function onConfirm(): Promise<void> {
     deleting = false
   }
 }
+
+/**
+ * What 確定 is wired to. The throttle covers the gap `deleting` cannot: a DELETE that
+ * lands inside a repeat press lowers the guard while the second press is still coming,
+ * and that one would answer 404 on a docket that went away perfectly well.
+ */
+const onConfirm = throttle(withdraw, WRITE_THROTTLE_MS)
 </script>
 
 <template>

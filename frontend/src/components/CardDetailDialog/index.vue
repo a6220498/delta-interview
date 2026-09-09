@@ -13,7 +13,7 @@ import {
   formatFullDueDate,
   formatTimestamp,
   isOverdue,
-} from '@/utils/task'
+} from '@/utils'
 
 import { CATEGORY_NAMES, LABELS, MESSAGES } from './const'
 import type { CardDetailDialogEmits, CardDetailDialogExposed } from './types'

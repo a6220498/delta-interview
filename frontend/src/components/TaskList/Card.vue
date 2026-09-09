@@ -5,8 +5,9 @@
  */
 import { computed, ref, useTemplateRef } from 'vue'
 
+import { WRITE_THROTTLE_MS } from '@/const/interaction'
 import { useTasksStore } from '@/stores/tasks'
-import { categoryDisplay, displayNumber, formatDueDate, isOverdue } from '@/utils/task'
+import { categoryDisplay, displayNumber, formatDueDate, isOverdue, throttle } from '@/utils'
 
 import { LABELS } from './const'
 import RowMenu from './RowMenu.vue'
@@ -64,7 +65,7 @@ let stamping = false
  *
  * @param completed - The state being asked for, not the one the card is holding.
  */
-async function onToggle(completed: boolean): Promise<void> {
+async function stamp(completed: boolean): Promise<void> {
   // A guard rather than a disabled mark: the second press asks for the state the
   // first one is already filing, so its answer would change nothing on the board.
   if (stamping) {
@@ -85,6 +86,13 @@ async function onToggle(completed: boolean): Promise<void> {
     stamping = false
   }
 }
+
+/**
+ * What the mark is wired to. The throttle covers the gap `stamping` cannot: a stamp that
+ * lands inside a repeat press lowers the guard, and the second press would then ask to
+ * put back the state the first one has just changed.
+ */
+const onToggle = throttle(stamp, WRITE_THROTTLE_MS)
 
 /**
  * The three-dot button, held so the menu can be hung from it. A ref rather than the

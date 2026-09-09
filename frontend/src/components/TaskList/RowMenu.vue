@@ -5,7 +5,7 @@
  */
 import { computed, onBeforeUnmount, onMounted, useTemplateRef } from 'vue'
 
-import { displayNumber } from '@/utils/task'
+import { displayNumber } from '@/utils'
 
 import { PLACEMENT, SCROLL_SLACK } from './const'
 import type { RowMenuEmits, RowMenuProps } from './types'
