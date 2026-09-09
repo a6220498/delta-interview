@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { storeToRefs } from 'pinia'
-import { onMounted, useTemplateRef } from 'vue'
+import { computed, onMounted, ref, useTemplateRef } from 'vue'
 
 import CardDetailDialog from '@/components/CardDetailDialog/index.vue'
 import type { CardDetailDialogExposed } from '@/components/CardDetailDialog/types'
@@ -8,6 +8,7 @@ import DeleteDialog from '@/components/DeleteDialog/index.vue'
 import type { DeleteDialogExposed } from '@/components/DeleteDialog/types'
 import Header from '@/components/Header/index.vue'
 import LoadFailure from '@/components/LoadFailure/index.vue'
+import RackSwitch from '@/components/RackSwitch/index.vue'
 import TaskDialog from '@/components/TaskDialog/index.vue'
 import type { TaskDialogExposed } from '@/components/TaskDialog/types'
 import TaskList from '@/components/TaskList/index.vue'
@@ -52,6 +53,23 @@ function reload(): void {
 function tasksFor(rack: TaskRack): TaskSummary[] {
   return taskList.value.filter((task) => task.completed === rack.completed)
 }
+
+// [AI assisted 009] 手機版一次只看一架是使用者裁示的版型。哪一架在畫面上由這裡持有，
+// 但「另一架被藏起來」是 CSS 的事（max-[700px]:hidden）—— 寬螢幕兩架同時在，這個值就不管事。
+/**
+ * The shelf on screen at phone widths, where the board shows one rack at a time.
+ * The first rack rather than a literal id, so the table below stays the only place
+ * the board's shelves are named.
+ */
+const activeRackId = ref(TASK_RACKS[0]?.id ?? '')
+
+/**
+ * How many tasks are on each shelf, keyed by rack id. The switch prints both counts,
+ * including the shelf it is not showing — that is what makes it worth pressing.
+ */
+const rackCounts = computed<Record<string, number>>(() =>
+  Object.fromEntries(TASK_RACKS.map((rack) => [rack.id, tasksFor(rack).length])),
+)
 
 // [AI assisted 008] 明細跟 openEdit 相反，不先 fetch 再開窗：卡片手上那一列已經畫得出
 // 六個欄位，只有說明要等，整窗一起等會讓五個已知欄位無謂地空著。
@@ -134,6 +152,17 @@ function openDelete(task: TaskSummary): void {
     />
 
     <!--
+      Draws itself only below 700px, where one shelf at a time is all that fits.
+      Above that it is display:none, and with it the choice it holds — both shelves
+      are on screen, so `activeRackId` decides nothing there.
+    -->
+    <RackSwitch
+      v-model="activeRackId"
+      :racks="TASK_RACKS"
+      :counts="rackCounts"
+    />
+
+    <!--
       Two equal columns, one below 880px where a pair of trays cannot hold a stub
       and title side by side. items-start lets a short tray keep its own height.
     -->
@@ -144,6 +173,7 @@ function openDelete(task: TaskSummary): void {
         :rack="rack"
         :tasks="tasksFor(rack)"
         :loading="loading"
+        :class="{ 'max-[700px]:hidden': rack.id !== activeRackId }"
         @detail="openDetail"
         @edit="openEdit"
         @delete="openDelete"

@@ -76,4 +76,31 @@ describe('MainLayout', () => {
       expect(wrapper.emitted('action')).toHaveLength(1)
     })
   })
+
+  describe('floating action button', () => {
+    it('offers the same action a second time, for the phone corner it sits in', () => {
+      const wrapper = mount(MainLayout)
+
+      // Named outright rather than by its glyph: `＋` is decoration everywhere else
+      // in the frame, and a button whose whole content is one would read as nothing.
+      const floating = wrapper.get('button[aria-label="新增工單"]')
+
+      expect(floating.text()).toBe('＋')
+    })
+
+    it('takes its name from the same label as the button in the heading row', () => {
+      const wrapper = mount(MainLayout, { props: { actionLabel: '匯出' } })
+
+      expect(wrapper.find('button[aria-label="新增工單"]').exists()).toBe(false)
+      expect(wrapper.get('button[aria-label="匯出"]').text()).toBe('＋')
+    })
+
+    it('reports the same action, so the caller never learns which button was pressed', async () => {
+      const wrapper = mount(MainLayout)
+
+      await wrapper.get('button[aria-label="新增工單"]').trigger('click')
+
+      expect(wrapper.emitted('action')).toHaveLength(1)
+    })
+  })
 })

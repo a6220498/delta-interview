@@ -36,10 +36,14 @@ const emit = defineEmits<MainLayoutEmits>()
             {{ heading }}
           </h2>
 
-          <!-- cursor-pointer is explicit: Tailwind 4 preflight gives buttons `cursor: default`. -->
+          <!--
+            cursor-pointer is explicit: Tailwind 4 preflight gives buttons `cursor: default`.
+            Gone below 700px, where the floating button under the board takes over —
+            a 34px box is under the 44px a thumb needs, and the row is tight there.
+          -->
           <button
             type="button"
-            class="inline-flex min-h-[34px] cursor-pointer appearance-none items-center gap-[7px] self-center rounded-sm border border-ink bg-ink px-3.5 font-display text-[14.5px] font-semibold tracking-[0.05em] whitespace-nowrap text-stock hover:border-stamp hover:bg-stamp focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-stamp"
+            class="inline-flex min-h-[34px] cursor-pointer appearance-none items-center gap-[7px] self-center rounded-sm border border-ink bg-ink px-3.5 font-display text-[14.5px] font-semibold tracking-[0.05em] whitespace-nowrap text-stock hover:border-stamp hover:bg-stamp focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-stamp max-[700px]:hidden"
             @click="emit('action')"
           >
             <!-- Full-width ＋ to match the CJK label's weight; announced by the label, not by this. -->
@@ -50,5 +54,21 @@ const emit = defineEmits<MainLayoutEmits>()
         <slot />
       </section>
     </main>
+
+    <!--
+      The same action again, in the corner a thumb reaches. Only ever one of the two
+      is displayed, so the frame never offers 新增工單 twice — this one below 700px,
+      the heading row's above it. Fixed to the viewport rather than to the board: the
+      pb-18 above is what keeps it off the last card.
+    -->
+    <button
+      type="button"
+      :aria-label="actionLabel"
+      class="fixed right-4 bottom-4 z-40 hidden size-14 cursor-pointer appearance-none place-items-center rounded-full bg-ink font-mono text-[26px] leading-none text-stock shadow-[0_3px_12px_rgba(31,28,24,0.34)] focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-stamp max-[700px]:grid"
+      @click="emit('action')"
+    >
+      <!-- The name is the label above; this glyph is the button's whole face. -->
+      ＋
+    </button>
   </div>
 </template>

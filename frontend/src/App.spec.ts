@@ -1,5 +1,6 @@
 import CardDetailDialog from '@/components/CardDetailDialog/index.vue'
 import DeleteDialog from '@/components/DeleteDialog/index.vue'
+import RackSwitch from '@/components/RackSwitch/index.vue'
 import TaskDialog from '@/components/TaskDialog/index.vue'
 import TaskList from '@/components/TaskList/index.vue'
 import type { Task, TaskSummary } from '@/types/task'
@@ -155,6 +156,46 @@ describe('App', () => {
 
     expect(open?.props('tasks').map((filed) => filed.id)).toEqual(['a'])
     expect(done?.props('tasks').map((filed) => filed.id)).toEqual(['b'])
+  })
+
+  describe('架別切換', () => {
+    /** The switch's segments, in board order. */
+    function segmentsOf(board: Board) {
+      return board.findComponent(RackSwitch).findAll('button')
+    }
+
+    it('hangs the switch in the content area, counting what is on each shelf', async () => {
+      // The counts are the reason it can be a switch at all: the shelf that is not
+      // on screen still reports how much is waiting on it.
+      fetchMock.mockResolvedValue(
+        jsonResponse(200, [task({ id: 'a' }), task({ id: 'b' }), task({ id: 'c', completed: true })]),
+      )
+      const wrapper = mountBoard()
+      await flushPromises()
+
+      expect(wrapper.get('main').findComponent(RackSwitch).exists()).toBe(true)
+      expect(segmentsOf(wrapper).map((segment) => segment.text())).toEqual(['未完成 2', '已完成 1'])
+    })
+
+    it('opens on the in-tray, which is the shelf with work left on it', () => {
+      const wrapper = mountBoard()
+
+      expect(segmentsOf(wrapper).map((segment) => segment.attributes('aria-pressed'))).toEqual([
+        'true',
+        'false',
+      ])
+    })
+
+    it('moves to the shelf that was pressed', async () => {
+      const wrapper = mountBoard()
+
+      await segmentsOf(wrapper)[1]?.trigger('click')
+
+      expect(segmentsOf(wrapper).map((segment) => segment.attributes('aria-pressed'))).toEqual([
+        'false',
+        'true',
+      ])
+    })
   })
 
   describe('檢視任務', () => {
@@ -411,7 +452,9 @@ describe('App', () => {
       await flushPromises()
 
       fetchMock.mockResolvedValue(jsonResponse(200, detail({ id: 'a', completed: true })))
-      await wrapper.get('main [aria-pressed]').trigger('click')
+      // Named, not just `[aria-pressed]`: the shelf switch above the trays is a
+      // pressed control too, and it is the first one in the content area.
+      await wrapper.get('main [aria-label^="狀態："]').trigger('click')
       await flushPromises()
 
       const [open, done] = wrapper.findAllComponents(TaskList)
@@ -431,7 +474,9 @@ describe('App', () => {
       await flushPromises()
 
       fetchMock.mockResolvedValue(jsonResponse(200, detail({ id: 'a', completed: false })))
-      await wrapper.get('main [aria-pressed]').trigger('click')
+      // Named, not just `[aria-pressed]`: the shelf switch above the trays is a
+      // pressed control too, and it is the first one in the content area.
+      await wrapper.get('main [aria-label^="狀態："]').trigger('click')
       await flushPromises()
 
       const [open, done] = wrapper.findAllComponents(TaskList)
