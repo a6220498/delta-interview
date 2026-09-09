@@ -1,3 +1,4 @@
+import { useTaskDrag } from '@/composables/useTaskDrag'
 import { WRITE_THROTTLE_MS } from '@/const/interaction'
 import type { Task, TaskSummary } from '@/types/task'
 import { enableAutoUnmount, flushPromises, mount } from '@vue/test-utils'
@@ -37,6 +38,10 @@ beforeEach(() => {
 afterEach(() => {
   Reflect.deleteProperty(HTMLElement.prototype, 'showPopover')
   Reflect.deleteProperty(HTMLElement.prototype, 'hidePopover')
+
+  // The drag gesture is module state, so a docket left in hand by one test would
+  // still be in hand in the next one.
+  useTaskDrag().release()
 })
 
 enableAutoUnmount(afterEach)
@@ -113,6 +118,14 @@ async function stamp(wrapper: ReturnType<typeof mount<typeof Card>>): Promise<vo
  */
 function passThrottleWindow(): void {
   vi.spyOn(Date, 'now').mockReturnValue(Date.now() + WRITE_THROTTLE_MS)
+}
+
+/**
+ * Builds the `DataTransfer` double a drag event would carry. jsdom dispatches the
+ * event this suite triggers but attaches nothing to it, so the double is passed in.
+ */
+function dataTransfer() {
+  return { effectAllowed: 'none', setData: vi.fn() }
 }
 
 /**
@@ -407,6 +420,45 @@ describe('Card', () => {
       await wrapper.get('[aria-haspopup]').trigger('click')
 
       expect(wrapper.emitted('detail')).toBeUndefined()
+    })
+  })
+
+  describe('拖曳換架', () => {
+    it('is a docket that can be picked up off the shelf', () => {
+      const wrapper = mount(Card, { props: { task: task() } })
+
+      expect(wrapper.get('article').attributes('draggable')).toBe('true')
+    })
+
+    it('puts itself in hand when the drag starts, so a tray knows what it is offered', async () => {
+      const wrapper = mount(Card, { props: { task: task({ id: 'a' }) } })
+
+      await wrapper.get('article').trigger('dragstart', { dataTransfer: dataTransfer() })
+
+      expect(useTaskDrag().dragged.value?.id).toBe('a')
+    })
+
+    it('files the id and the move effect on the drag itself', async () => {
+      // Not what the drop reads back — the gesture holds the whole row — but a drag
+      // carrying nothing is refused outright by Firefox.
+      const transfer = dataTransfer()
+      const wrapper = mount(Card, { props: { task: task({ id: 'a' }) } })
+
+      await wrapper.get('article').trigger('dragstart', { dataTransfer: transfer })
+
+      expect(transfer.effectAllowed).toBe('move')
+      expect(transfer.setData).toHaveBeenCalledWith('text/plain', 'a')
+    })
+
+    it('lets go when the drag ends, however it ended', async () => {
+      // dragend fires on a drop that landed and on one abandoned mid-air alike;
+      // a docket left in hand would keep every tray lit for the rest of the session.
+      const wrapper = mount(Card, { props: { task: task() } })
+
+      await wrapper.get('article').trigger('dragstart', { dataTransfer: dataTransfer() })
+      await wrapper.get('article').trigger('dragend')
+
+      expect(useTaskDrag().dragged.value).toBeNull()
     })
   })
 })

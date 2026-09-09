@@ -33,6 +33,7 @@ delta-interview/
 | Node | >= 20 |
 | pnpm | >= 10 |
 | **JDK** | **21 ~ 25（建置目標為 21）** |
+| Maven | >= 3.9.6（本專案不附 wrapper，請用系統安裝的 `mvn`） |
 
 後端鎖定 Java 21：它是 LTS，且 Spring Boot 3.5.16 官方支援範圍是 Java 17–25。
 Java 26 是 non-LTS、OpenJDK 支援已於 2026/09 結束，**且超出 Boot 3.5.16 的支援範圍**。
@@ -54,7 +55,11 @@ cp backend/toolchains.xml.example ~/.m2/toolchains.xml
 ## 快速開始
 
 ```bash
-pnpm install                  # 安裝前端相依（後端用 Maven）
+pnpm install                  # 安裝前端相依（後端相依由 Maven 自行下載）
+
+# macOS / Homebrew 需要這一行，其他環境多半不用。少了它，後端會停在
+# 「Cannot find matching toolchain definitions」而不是啟動 —— 理由見〈環境需求〉。
+cp backend/toolchains.xml.example ~/.m2/toolchains.xml
 
 pnpm backend:dev              # 後端  → http://localhost:8080
 pnpm dev                      # 前端  → http://localhost:5173
@@ -66,6 +71,14 @@ Vite 會把 `/api` proxy 到 `localhost:8080`，因此開發環境同源、後�
 - Swagger UI：<http://localhost:8080/swagger-ui.html>（直接讀 `api/openapi.yaml` 本身，
   不是由 annotation 反推出來的規格）
 - 契約原檔：<http://localhost:8080/openapi.yaml>
+
+任務存在後端的記憶體裡（`ConcurrentHashMap`），**沒有預載資料**：第一次打開是一片空看板，
+卡片要自己建，後端一重啟就清空。要快速塞幾張進去，可以直接打 `POST /api/tasks`：
+
+```bash
+curl -X POST localhost:8080/api/tasks -H 'Content-Type: application/json' \
+  -d '{"title":"第一張單","category":1}'
+```
 
 ## 常用指令
 
@@ -149,7 +162,8 @@ Java 得到兩個各自獨立的 model，TypeScript 得到 `TaskSummary & { desc
 
 長度限制寫在契約裡，後端因此拿到產生出來的 `@Size` / `@NotNull`，違反時由 Spring 直接回
 400 problem details，controller 不需要自己檢查。（`openapi-typescript` 不會把長度帶進型別，
-所以前端 `TaskComposer.vue` 的 `maxlength` 是手寫的 UI 提示，實際把關的仍是後端。）
+所以前端在 `TaskDialog/const/task-dialog.ts` 手寫了一份 `FIELD_LIMITS`，當成兩個文字欄位的
+`maxlength`；那只是 UI 提示，實際把關的仍是後端。）
 標題長度是**驗證**而不是**顯示**：畫面不主動印「還剩幾字」，只有超出上限、驗證沒過時才跳錯誤。
 
 #### `category`：數字碼而不是名字
@@ -232,23 +246,35 @@ RFC 9457 problem details，對應 Spring 的 `ProblemDetail`：`type`、`title`�
 
 ## 前端
 
-技術棧與資料夾結構依 `.claude/frontend/rules` 制定：
-
 ```
 frontend/src/
-├── api/            # http.ts (fetch + ApiError)、tasks.ts (契約型別化的 5 個操作)
-│   └── generated/  # openapi-typescript 產物，不進版控
+├── api/                    # http.ts (fetch + ApiError)、tasks.ts (契約型別化的 5 個操作)
+│   └── generated/          # openapi-typescript 產物，不進版控
 ├── assets/
-├── components/     # TaskItem.vue、TaskComposer.vue (+ *.spec.ts)
+├── components/             # 一個元件一個資料夾
+│   ├── CardDetailDialog/   #   工單明細窗
+│   ├── DeleteDialog/       #   刪除確認
+│   ├── Header/             #   抬頭
+│   ├── LoadFailure/        #   載入失敗
+│   ├── RackSwitch/         #   375px 版型的架別切換
+│   ├── TaskDialog/         #   新增／編輯表單
+│   └── TaskList/           #   托盤，另含 Card.vue 與 RowMenu.vue
 ├── composables/
-├── stores/         # Pinia：tasks.ts (+ tasks.spec.ts)
-├── styles/         # _core.scss — Tailwind 表達不了的共用 SCSS
-├── types/          # task.ts — 對外重新匯出契約型別
-├── utils/
+├── const/                  # 跨元件的常數：task.ts (架別)、interaction.ts (寫入節流)
+├── layouts/
+│   └── MainLayout/         # 看板版型與右下角浮動新增鈕
+├── stores/                 # Pinia：tasks.ts
+├── styles/                 # _core.scss — Tailwind 表達不了的共用 SCSS
+├── types/                  # task.ts — 對外重新匯出契約型別
+├── utils/                  # task.ts (工單編號、逾期、日期等顯示轉換)、throttle.ts
 ├── App.vue
-└── style.css       # Tailwind 4 設定與 @theme 色票（沒有 tailwind.config.js）
+├── main.ts
+└── style.css               # Tailwind 4 設定與 @theme 色票（沒有 tailwind.config.js）
 ```
 
+- **一個元件一個資料夾**：進入點固定是 `index.vue`，測試是同層的 `index.spec.ts`，
+  只有這個元件用得到的常數與型別放它自己的 `const/` 與 `types/`。共用的才升到
+  `src/const/`、`src/types/` —— 例如三顆寫入按鈕共用的節流毫秒數。
 - **Tailwind 4** 沒有 `tailwind.config.js`，設計 token 全部寫在 `src/style.css` 的
   `@theme` 區塊；深色模式由 `prefers-color-scheme` 重新定義同一組 token 完成，
   模板中不出現 `dark:` variant。
@@ -260,8 +286,8 @@ frontend/src/
 ```
 backend/src/main/java/com/delta/interview/
 ├── DeltaInterviewApplication.java
-├── common/   # Clock bean、TaskNotFoundException → 404 problem detail
-└── task/     # TaskController (implements TasksApi)、TaskRepository
+├── common/   # ApplicationConfiguration (Clock bean)、GlobalExceptionHandler (→ 404 problem detail)
+└── task/     # TaskController (implements TasksApi)、TaskRepository、TaskNotFoundException
 ```
 
 目前以 `ConcurrentHashMap` 作為記憶體儲存，並**直接存放產生出來的 `Task` model**，

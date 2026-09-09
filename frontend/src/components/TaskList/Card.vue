@@ -1,14 +1,9 @@
 <script setup lang="ts">
-/**
- * One task drawn as a paper docket. It files its own stamp and passes the menu's two
- * choices up; its three states differ in shape as well as colour, never colour alone.
- */
 import { computed, ref, useTemplateRef } from 'vue'
-
+import { useTaskDrag } from '@/composables/useTaskDrag'
 import { WRITE_THROTTLE_MS } from '@/const/interaction'
 import { useTasksStore } from '@/stores/tasks'
 import { categoryDisplay, displayNumber, formatDueDate, isOverdue, throttle } from '@/utils'
-
 import { LABELS } from './const'
 import RowMenu from './RowMenu.vue'
 import type { CardEmits, CardProps } from './types'
@@ -17,10 +12,6 @@ const props = defineProps<CardProps>()
 
 const emit = defineEmits<CardEmits>()
 
-/**
- * The board's tasks, and the request that stamps one. Written through the store rather
- * than reported upwards: which shelf this docket hangs on is read off the row below.
- */
 const tasksStore = useTasksStore()
 
 const number = computed(() => displayNumber(props.task))
@@ -29,8 +20,7 @@ const overdue = computed(() => isOverdue(props.task))
 const stateLabel = computed(() => (props.task.completed ? LABELS.done : LABELS.open))
 
 /**
- * The stub's paper, ink and knockout colour for the current state. One object, so
- * the knockout cannot fall out of step with the paper behind it.
+ * The card's left flag style
  */
 const stub = computed(() => {
   if (props.task.completed) {
@@ -92,6 +82,23 @@ async function stamp(completed: boolean): Promise<void> {
 const onToggle = throttle(stamp, WRITE_THROTTLE_MS)
 
 /**
+ * The gesture this docket is lifted into, and whether it is the one currently in hand.
+ * Where it lands is the tray's business — the card only reports being picked up.
+ */
+const { dragged, lift, release } = useTaskDrag()
+
+const inHand = computed(() => dragged.value?.id === props.task.id)
+
+/**
+ * Puts this docket in hand as the drag starts.
+ *
+ * @param event - The `dragstart`, for the `dataTransfer` the browser wants filled in.
+ */
+function onDragStart(event: DragEvent): void {
+  lift(props.task, event.dataTransfer)
+}
+
+/**
  * The three-dot button, held so the menu can be hung from it. A ref rather than the
  * click event's `currentTarget`, which is a bare `EventTarget` and short-lived.
  */
@@ -134,8 +141,11 @@ function onMenuClose(byButton: boolean): void {
 
 <template>
   <article
-    class="relative grid grid-cols-[26px_1fr] rounded-sm border border-rule shadow-[0_1px_0_rgba(31,28,24,0.18)]"
-    :class="task.completed ? 'bg-stock-2' : 'bg-stock'"
+    draggable="true"
+    class="relative grid cursor-grab grid-cols-[26px_1fr] rounded-sm border border-rule shadow-[0_1px_0_rgba(31,28,24,0.18)] active:cursor-grabbing"
+    :class="[task.completed ? 'bg-stock-2' : 'bg-stock', inHand ? 'opacity-40' : undefined]"
+    @dragstart="onDragStart"
+    @dragend="release"
   >
     <!--
       The two round punches are painted the tray's colour, so the card reads as
@@ -239,12 +249,7 @@ function onMenuClose(byButton: boolean): void {
         </span>
       </div>
 
-      <!--
-        A refused stamp says so here, on the docket that stayed put. Not drawn while
-        empty: a row kept for a message that is usually absent would grow every card.
-        The margin on a stamped card is the strip 完成 DONE sits in — it is positioned
-        against the card, and without it the reason would run under the stamp.
-      -->
+      <!-- status api error tip -->
       <p
         v-if="toggleError"
         data-toggle-error

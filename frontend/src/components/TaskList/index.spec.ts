@@ -1,18 +1,52 @@
+import { useTaskDrag } from '@/composables/useTaskDrag'
 import { TASK_RACKS } from '@/const/task'
 import type { TaskRack } from '@/const/task'
-import type { TaskSummary } from '@/types/task'
-import { mount } from '@vue/test-utils'
+import type { Task, TaskSummary } from '@/types/task'
+import { flushPromises, mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
-import { beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { nextTick } from 'vue'
 
 import Card from './Card.vue'
 import TaskList from './index.vue'
+
+const fetchMock = vi.fn<typeof fetch>()
 
 beforeEach(() => {
   // Stacking a shelf mounts cards, and a card reaches for the store to file its own
   // stamp. Nothing here presses the mark, so an empty board of its own is enough.
   setActivePinia(createPinia())
+
+  // The tray files the stamp a dropped docket asks for, so it needs a server to
+  // answer; the tests that care what came back say so.
+  vi.stubGlobal('fetch', fetchMock)
+  fetchMock.mockReset()
+  fetchMock.mockResolvedValue(jsonResponse(200, stamped()))
 })
+
+afterEach(() => {
+  // The drag gesture is module state, so a docket left in hand by one test would
+  // still be in hand in the next one.
+  useTaskDrag().release()
+})
+
+/** Builds a `fetch` Response double with the given status and JSON body. */
+function jsonResponse(status: number, body: unknown): Response {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { 'Content-Type': 'application/json' },
+  })
+}
+
+/** Builds the whole task the completion endpoint answers with: the row plus its detail. */
+function stamped(overrides: Partial<Task> = {}): Task {
+  return { ...task(), description: null, completed: true, ...overrides }
+}
+
+/** Returns the options passed to the most recent `fetch` call. */
+function lastInit(): RequestInit {
+  return fetchMock.mock.calls.at(-1)?.[1] ?? {}
+}
 
 /**
  * Builds one of the rows the board hands down. A `TaskSummary`, not a `Task`: the
@@ -186,6 +220,168 @@ describe('TaskList', () => {
       await cardAt(wrapper, 1).vm.$emit('detail')
 
       expect(wrapper.emitted('detail')).toEqual([[readme]])
+    })
+  })
+
+  describe('拖曳換架', () => {
+    /**
+     * Drags a docket over the tray `wrapper` is showing, and reports whether the tray
+     * took it: a drop target is exactly an element that cancels `dragover`.
+     */
+    function dragOver(wrapper: ReturnType<typeof mountList>): boolean {
+      const event = new Event('dragover', { bubbles: true, cancelable: true })
+
+      wrapper.get('[data-tray]').element.dispatchEvent(event)
+
+      return event.defaultPrevented
+    }
+
+    it('offers itself as a shelf for a docket that belongs on the other one', async () => {
+      const wrapper = mount(TaskList, { props: { rack: rack('done'), tasks: [] } })
+
+      useTaskDrag().lift(task({ completed: false }), null)
+
+      expect(dragOver(wrapper)).toBe(true)
+
+      await nextTick()
+
+      expect(wrapper.get('[data-tray]').attributes('data-over')).toBe('true')
+    })
+
+    it('turns down a docket it already holds, which is no move at all', async () => {
+      const wrapper = mount(TaskList, { props: { rack: rack('open'), tasks: [] } })
+
+      useTaskDrag().lift(task({ completed: false }), null)
+
+      expect(dragOver(wrapper)).toBe(false)
+
+      await nextTick()
+
+      expect(wrapper.get('[data-tray]').attributes('data-over')).toBeUndefined()
+    })
+
+    it('is not a drop target while nothing is being dragged at all', () => {
+      const wrapper = mount(TaskList, { props: { rack: rack('done'), tasks: [] } })
+
+      expect(dragOver(wrapper)).toBe(false)
+    })
+
+    it('stops offering itself once the docket is carried back out', async () => {
+      const wrapper = mount(TaskList, { props: { rack: rack('done'), tasks: [] } })
+
+      useTaskDrag().lift(task({ completed: false }), null)
+      dragOver(wrapper)
+
+      // relatedTarget is where the pointer went; outside the tray, so it has left.
+      await wrapper.get('[data-tray]').trigger('dragleave', { relatedTarget: document.body })
+
+      expect(wrapper.get('[data-tray]').attributes('data-over')).toBeUndefined()
+    })
+
+    it('keeps the offer up while the pointer crosses a card inside it', async () => {
+      // dragleave fires on every boundary inside the tray too; taking the offer
+      // down there would make it flicker across a shelf that has cards on it.
+      const wrapper = mount(TaskList, {
+        props: { rack: rack('done'), tasks: three },
+        attachTo: document.body,
+      })
+
+      useTaskDrag().lift(task({ completed: false }), null)
+      dragOver(wrapper)
+      await nextTick()
+
+      await wrapper
+        .get('[data-tray]')
+        .trigger('dragleave', { relatedTarget: wrapper.get('article').element })
+
+      expect(wrapper.get('[data-tray]').attributes('data-over')).toBe('true')
+
+      wrapper.unmount()
+    })
+
+    it('files the state of the shelf it was dropped on, not a toggle', async () => {
+      // The same endpoint the mark presses: dropping a docket here says where it
+      // now belongs, which is what the tray already knows about itself.
+      const wrapper = mount(TaskList, { props: { rack: rack('done'), tasks: [] } })
+
+      useTaskDrag().lift(task({ id: 'a', completed: false }), null)
+
+      await wrapper.get('[data-tray]').trigger('drop')
+      await flushPromises()
+
+      expect(String(fetchMock.mock.calls.at(-1)?.[0])).toBe('/api/tasks/a/completion')
+      expect(JSON.parse(String(lastInit().body))).toEqual({ completed: true })
+    })
+
+    it('sends nothing when a docket is dropped back on the shelf it came from', async () => {
+      const wrapper = mount(TaskList, { props: { rack: rack('open'), tasks: [] } })
+
+      useTaskDrag().lift(task({ completed: false }), null)
+
+      await wrapper.get('[data-tray]').trigger('drop')
+      await flushPromises()
+
+      expect(fetchMock).not.toHaveBeenCalled()
+    })
+
+    it('sends nothing when the tray is dropped on with empty hands', async () => {
+      const wrapper = mount(TaskList, { props: { rack: rack('done'), tasks: [] } })
+
+      await wrapper.get('[data-tray]').trigger('drop')
+      await flushPromises()
+
+      expect(fetchMock).not.toHaveBeenCalled()
+    })
+
+    it('lets go of the docket as it lands, so no tray stays lit afterwards', async () => {
+      const wrapper = mount(TaskList, { props: { rack: rack('done'), tasks: [] } })
+
+      useTaskDrag().lift(task({ completed: false }), null)
+
+      await wrapper.get('[data-tray]').trigger('drop')
+      await flushPromises()
+
+      expect(useTaskDrag().dragged.value).toBeNull()
+      expect(wrapper.get('[data-tray]').attributes('data-over')).toBeUndefined()
+    })
+
+    it('says on the shelf why a docket dropped here did not make it', async () => {
+      // The docket stays where it was, so the tray it was aimed at is the only
+      // place that can say the drop was refused.
+      fetchMock.mockResolvedValue(
+        jsonResponse(404, { status: 404, title: 'Not Found', detail: '這張單子已經不在了。' }),
+      )
+
+      const wrapper = mount(TaskList, { props: { rack: rack('done'), tasks: [] } })
+
+      useTaskDrag().lift(task({ completed: false }), null)
+
+      await wrapper.get('[data-tray]').trigger('drop')
+      await flushPromises()
+
+      const notice = wrapper.get('[data-drop-error]')
+
+      expect(notice.text()).toContain('狀態沒改到')
+      expect(notice.text()).toContain('這張單子已經不在了。')
+      expect(notice.attributes('role')).toBe('alert')
+    })
+
+    it('clears the refusal once a later drop lands', async () => {
+      fetchMock.mockResolvedValueOnce(
+        jsonResponse(404, { status: 404, title: 'Not Found', detail: '這張單子已經不在了。' }),
+      )
+
+      const wrapper = mount(TaskList, { props: { rack: rack('done'), tasks: [] } })
+
+      useTaskDrag().lift(task({ id: 'a', completed: false }), null)
+      await wrapper.get('[data-tray]').trigger('drop')
+      await flushPromises()
+
+      useTaskDrag().lift(task({ id: 'b', completed: false }), null)
+      await wrapper.get('[data-tray]').trigger('drop')
+      await flushPromises()
+
+      expect(wrapper.find('[data-drop-error]').exists()).toBe(false)
     })
   })
 })
