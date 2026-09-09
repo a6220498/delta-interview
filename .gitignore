@@ -23,5 +23,5 @@ backend/target/
 !.vscode/extensions.json
 *.iml
 
-# ---- Design ----
-docs
+# session 間的內部交接筆記，不隨 repo 交付。
+docs/HANDOFF.md

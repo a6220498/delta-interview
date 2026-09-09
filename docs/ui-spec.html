@@ -1,0 +1,2235 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<!-- 任務管理應用程式 — UIUX 規格頁（設計階段產出，非正式程式碼）
+     原始 artifact：https://claude.ai/code/artifact/1908e40d-24e8-482e-b948-4baf7309c5c3 -->
+<style>:root{color-scheme:light}body{margin:0}img{max-width:100%}[hidden]{display:none!important}</style>
+<title>任務管理應用程式</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@400;500;600;700&family=Barlow:wght@400;500;600&family=Courier+Prime:wght@400;700&family=Noto+Sans+TC:wght@400;500;700;900&display=swap">
+
+<style>
+/* ============================================================
+   任務管理應用程式 — 介面規格
+   紙本多聯工單的視覺語彙：存根、撕孔、橡皮章、複寫紙
+   單一主題（日班）。所有顏色皆明確指定，不隨宿主主題改變。
+   ============================================================ */
+
+:root {
+  --desk:      #BFBCB1;   /* 工作檯 */
+  --tray:      #B2AEA2;   /* 凹陷托盤 */
+  --tray-edge: #9E9A8E;
+  --stock:     #F0EEE7;   /* 單據紙 */
+  --stock-2:   #E3E0D6;   /* 第二聯／已歸檔 */
+  --stub:      #E7E4DA;   /* 存根 */
+  --ink:       #1F1C18;
+  --ink-2:     #4A453D;
+  --ink-3:     #6E685D;   /* 4.76:1 on --stock */
+  --rule:      #C8C3B6;
+  --rule-2:    #D8D4C9;
+  --stamp:     #5B3FA8;   /* 完成章印油 6.64:1 */
+  --stamp-bg:  #EAE5F5;
+  --alert:     #B5321F;   /* 逾期紅 5.26:1 */
+  --alert-2:   #8F2718;   /* 刪除鈕 hover 7.32:1 */
+  --alert-bg:  #F3DED9;
+  --focus:     #1F1C18;
+  --shadow:    rgba(31,28,24,.18);
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--desk);
+  color: var(--ink);
+  font-family: "Barlow", "Noto Sans TC", ui-sans-serif, system-ui, sans-serif;
+  font-size: 15px;
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+}
+
+.wrap { max-width: 1060px; margin: 0 auto; padding: 0 20px 72px; }
+
+/* ---------- 抬頭 ---------- */
+
+.masthead {
+  display: flex;
+  align-items: stretch;
+  gap: 14px;
+  margin-top: 38px;
+}
+/* 抬頭牌：反白的墨塊，全頁唯一一處把紙翻成墨 */
+.plate {
+  flex: 0 1 auto;
+  min-width: 0;
+  background: var(--ink);
+  border-radius: 2px;
+  padding: 14px 24px 17px;
+}
+h1 {
+  font-family: "Noto Sans TC", "Barlow Semi Condensed", ui-sans-serif, sans-serif;
+  font-size: clamp(25px, 4.5vw, 40px);
+  font-weight: 900;
+  letter-spacing: .15em;
+  line-height: 1.12;
+  margin: 0 -.15em 0 0;
+  color: var(--stock);
+  text-wrap: balance;
+}
+/* 抬頭牌右側延伸出去的粗細雙線，紙本表單的分隔慣例 */
+.mast-rule {
+  flex: 1 1 auto;
+  min-width: 40px;
+  align-self: flex-end;
+  height: 8px;
+  margin-bottom: 15px;
+  border-top: 2px solid var(--ink);
+  border-bottom: 1px solid var(--ink);
+}
+@media (max-width: 520px) { .mast-rule { display: none; } }
+
+/* ---------- 區段標題 ---------- */
+
+.sec { margin-top: 54px; }
+.sec-head {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  border-bottom: 1px solid var(--ink);
+  padding-bottom: 6px;
+  margin-bottom: 18px;
+}
+.sec-no {
+  font-family: "Courier Prime", "Noto Sans TC", ui-monospace, monospace;
+  font-size: 12px;
+  color: var(--ink-3);
+  letter-spacing: .08em;
+}
+.sec-head h2 {
+  font-family: "Barlow Semi Condensed", "Noto Sans TC", ui-sans-serif, sans-serif;
+  font-size: 21px;
+  font-weight: 600;
+  letter-spacing: .01em;
+  margin: 0;
+  flex: 1;
+}
+.sec-note {
+  font-size: 12.5px;
+  color: var(--ink-3);
+  text-align: right;
+  max-width: 40ch;
+}
+
+/* ---------- 看板 ---------- */
+
+.board {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 14px;
+  align-items: start;
+}
+@media (max-width: 880px) { .board { grid-template-columns: 1fr; } }
+
+.tray {
+  background: var(--tray);
+  border: 1px solid var(--tray-edge);
+  border-top-width: 3px;
+  border-top-color: var(--ink);
+  padding: 10px;
+  min-height: 220px;
+}
+.tray.over { border-color: var(--stamp); box-shadow: inset 0 0 0 2px var(--stamp); }
+
+.tray-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 2px 4px 10px;
+}
+.tray-head h3 {
+  font-family: "Barlow Semi Condensed", "Noto Sans TC", ui-sans-serif, sans-serif;
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  margin: 0;
+  color: var(--ink);
+}
+/* 計數牌：實心墨塊，架上有幾張單一眼看得到 */
+.tally {
+  font-family: "Barlow", "Noto Sans TC", ui-sans-serif, sans-serif;
+  font-size: 15px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+  color: var(--stock);
+  background: var(--ink);
+  border-radius: 2px;
+  min-width: 26px;
+  padding: 5px 6px 6px;
+  text-align: center;
+}
+.tray[data-tray="done"] .tally { background: var(--stamp); }
+/* 托盤標籤：實體收件／發件盤上的鋼印字，不是把 JSON 欄位貼到畫面上 */
+.tray-hint {
+  margin-left: auto;
+  font-family: "Barlow Semi Condensed", "Noto Sans TC", ui-sans-serif, sans-serif;
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: .18em;
+  text-transform: uppercase;
+  color: var(--ink);
+  border-bottom: 1px solid var(--ink);
+  padding-bottom: 1px;
+}
+
+.stack { display: flex; flex-direction: column; gap: 9px; }
+
+/* ---------- 工單 ---------- */
+
+.docket {
+  position: relative;
+  display: grid;
+  grid-template-columns: 26px 1fr;
+  background: var(--stock);
+  border: 1px solid var(--rule);
+  border-radius: 2px;
+  box-shadow: 0 1px 0 var(--shadow);
+  cursor: grab;
+}
+.docket:active { cursor: grabbing; }
+.docket.dragging { opacity: .4; }
+.docket.done { background: var(--stock-2); }
+
+/* 存根：撕孔虛線 + 上下打孔。類別記號在上，直排編號在下。
+   狀態色收斂成兩個變數 —— --paper 是這張存根的紙色、color 是它的墨色，
+   底下的編號與類別記號都吃 currentColor，不必為每個狀態各寫一條規則。 */
+.stub {
+  position: relative;
+  --paper: var(--stub);
+  background: var(--paper);
+  color: var(--ink-3);
+  border-right: 1px dashed var(--rule);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding: 8px 0;
+  border-radius: 2px 0 0 2px;
+}
+.docket.done .stub     { --paper: var(--stamp-bg); color: var(--stamp); }
+.docket.overdue .stub  { --paper: var(--alert-bg); color: var(--alert); }
+.stub::before, .stub::after {
+  content: "";
+  position: absolute;
+  right: -4px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--tray);
+}
+.stub::before { top: -4px; }
+.stub::after { bottom: -4px; }
+.stub code {
+  writing-mode: vertical-rl;
+  font-family: "Courier Prime", "Noto Sans TC", ui-monospace, monospace;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: .1em;
+  color: inherit;
+  font-variant-numeric: tabular-nums;
+}
+
+/* [AI assisted 004] 類別記號改用形狀而非顏色，是與 AI 討論後的決定：契約裡
+   category 的描述寫它 drives「the card's colour」，但卡片的顏色已經被逾期（紅）
+   與完成（紫）用掉，第三條色軸會跟它們搶注意力，也會踩到本頁自己訂的
+   「狀態不只用顏色」。畫面這邊刻意沒照契約那句話做。
+   類別記號：實心＝bug，空心＝feat。刻意不開第三條色軸 —— 卡片上的顏色
+   已經被逾期（紅）與完成（紫）用掉，再加一組類別色會跟它們搶讀者的注意力，
+   也會踩到「狀態不只用顏色」那條規則。改用實心／空心的形狀差異，
+   把顏色留給狀態。字母對讀屏是冗餘的（編號本身已經印著 bug/feat），
+   所以整個記號 aria-hidden。 */
+.cat {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: 15px;
+  height: 15px;
+  border: 1.5px solid currentColor;
+  border-radius: 2px;
+  font-family: "Courier Prime", "Noto Sans TC", ui-monospace, monospace;
+  font-size: 9px;
+  font-weight: 700;
+  line-height: 1;
+}
+.cat[data-cat="bug"] { background: currentColor; }
+.cat[data-cat="bug"] > span { color: var(--paper); }
+/* 載入中：類別還不知道，留一個空框，位置先佔住 */
+.cat:empty { border-style: dashed; opacity: .5; }
+
+.body { padding: 9px 11px 8px; min-width: 0; }
+
+.title {
+  font-family: "Barlow Semi Condensed", "Noto Sans TC", ui-sans-serif, sans-serif;
+  font-size: 17px;
+  font-weight: 500;
+  line-height: 1.3;
+  color: var(--ink);
+  margin: 0 0 8px;
+  padding-right: 26px;
+  overflow-wrap: anywhere;
+}
+.docket.done .title { color: var(--ink-2); text-decoration: line-through; text-decoration-color: var(--stamp); text-decoration-thickness: 1.5px; }
+
+/* [AI assisted 007] 「點卡片開明細」的做法是與 AI 討論後選的：整張 .docket 掛
+   click 會做出巢狀互動元素，那兩顆既有的按鈕還得靠 stopPropagation 補救。改成
+   標題本身是按鈕、用 ::after 把感應區撐滿整張卡（stretched link）—— 滑鼠拿到
+   整張卡，無障礙樹只多一顆按鈕，而且那兩顆是它的兄弟節點，不必攔任何事件。
+   代價寫在這裡：覆蓋層蓋住整張卡，卡片上的文字選不起來。 */
+.title .open {
+  appearance: none;
+  background: transparent;
+  border: 0;
+  padding: 0;
+  margin: 0;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  overflow-wrap: anywhere;
+  cursor: pointer;
+}
+.title .open::after { content: ""; position: absolute; inset: 0; border-radius: 2px; }
+.title .open:hover { text-decoration: underline; text-underline-offset: 3px; text-decoration-thickness: 1px; }
+/* 焦點框畫在覆蓋層上：可按的範圍是整張卡，框就該框住整張卡 */
+.title .open:focus-visible { outline: none; }
+.title .open:focus-visible::after { outline: 2px solid var(--stamp); outline-offset: -2px; }
+/* text-decoration 不會穿進 inline-block，所以已完成的刪除線要在按鈕上再寫一次 */
+.docket.done .title .open { text-decoration: line-through; text-decoration-color: var(--stamp); text-decoration-thickness: 1.5px; }
+/* 這兩顆浮在覆蓋層之上，各按各的 */
+.mark, .menubtn { z-index: 1; }
+
+.foot { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+
+.mark {
+  position: relative;
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: transparent;
+  border: 1px solid var(--rule);
+  border-radius: 2px;
+  color: var(--ink-2);
+  font-family: "Courier Prime", "Noto Sans TC", ui-monospace, monospace;
+  font-size: 10.5px;
+  letter-spacing: .06em;
+  padding: 3px 7px 3px 5px;
+  cursor: pointer;
+  min-height: 24px;
+}
+/* 視覺 24px，命中區撐到 44px 高 */
+.mark::before { content: ""; position: absolute; inset: -10px -2px; }
+.mark:hover { border-color: var(--ink-2); color: var(--ink); }
+.mark:focus-visible { outline: 2px solid var(--stamp); outline-offset: 1px; }
+.mark .tick {
+  width: 12px; height: 12px;
+  border: 1.5px solid var(--ink-3);
+  display: grid; place-items: center;
+  font-size: 10px; line-height: 1;
+  color: transparent;
+}
+.docket.done .mark { border-color: var(--stamp); color: var(--stamp); }
+.docket.done .mark .tick { border-color: var(--stamp); background: var(--stamp); color: var(--stock); }
+
+.due {
+  font-family: "Courier Prime", "Noto Sans TC", ui-monospace, monospace;
+  font-size: 11px;
+  color: var(--ink-3);
+  font-variant-numeric: tabular-nums;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.due.late { color: var(--alert); font-weight: 700; }
+.due.late::after {
+  content: "逾期";
+  border: 1px solid var(--alert);
+  padding: 0 4px;
+  font-size: 9.5px;
+  letter-spacing: .08em;
+  font-weight: 400;
+}
+
+/* 三點鈕：單子右上角，唯一的入口；操作藏在選單裡，卡片本體維持乾淨 */
+.menubtn {
+  position: absolute;
+  top: 4px; right: 4px;
+  appearance: none;
+  display: grid;
+  gap: 3px;
+  place-content: center;
+  width: 26px; height: 26px;
+  background: transparent;
+  border: 0;
+  border-radius: 2px;
+  color: var(--ink-3);
+  cursor: pointer;
+}
+.menubtn i { display: block; width: 3px; height: 3px; border-radius: 50%; background: currentColor; }
+/* 視覺 26px，命中區撐到 44×44 */
+.menubtn::before { content: ""; position: absolute; inset: -9px; }
+.menubtn:hover { background: var(--stamp-bg); color: var(--stamp); }
+.menubtn:focus-visible { outline: 2px solid var(--stamp); outline-offset: 1px; }
+.docket.done .menubtn { color: var(--ink-2); }
+
+/* 單子選單：原生 popover，開在 top layer，不會被托盤裁掉 */
+.rowmenu {
+  position: fixed;
+  inset: auto;
+  margin: 0;
+  width: 148px;
+  padding: 4px;
+  background: var(--stock);
+  border: 1px solid var(--rule);
+  border-top: 3px solid var(--ink);
+  border-radius: 2px;
+  box-shadow: 0 8px 22px rgba(31,28,24,.28);
+  color: var(--ink);
+}
+.rowmenu:popover-open { display: grid; gap: 2px; }
+.rowmenu.static { position: static; display: grid; gap: 2px; width: auto; box-shadow: none; }
+.rowmenu-no {
+  font-family: "Courier Prime", "Noto Sans TC", ui-monospace, monospace;
+  font-size: 9.5px;
+  letter-spacing: .12em;
+  color: var(--ink-3);
+  padding: 4px 9px 6px;
+  border-bottom: 1px dashed var(--rule);
+  margin-bottom: 2px;
+}
+.rowmenu .m-edit, .rowmenu .m-del {
+  appearance: none;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  background: transparent;
+  border: 0;
+  border-radius: 2px;
+  color: var(--ink);
+  font-family: "Barlow Semi Condensed", "Noto Sans TC", ui-sans-serif, sans-serif;
+  font-size: 15.5px;
+  letter-spacing: .02em;
+  text-align: left;
+  padding: 0 9px;
+  min-height: 44px;
+  cursor: pointer;
+}
+.rowmenu .g {
+  font-family: "Courier Prime", "Noto Sans TC", ui-monospace, monospace;
+  font-size: 12px;
+  color: var(--ink-3);
+  width: 12px;
+  text-align: center;
+}
+.rowmenu .m-edit:hover { background: var(--stamp-bg); color: var(--stamp); }
+.rowmenu .m-edit:hover .g { color: var(--stamp); }
+.rowmenu .m-del { color: var(--alert); }
+.rowmenu .m-del .g { color: var(--alert); }
+.rowmenu .m-del:hover { background: var(--alert-bg); }
+.rowmenu .m-edit:focus-visible, .rowmenu .m-del:focus-visible { outline: 2px solid var(--stamp); outline-offset: -2px; }
+
+/* 橡皮章 */
+.chop {
+  position: absolute;
+  right: 8px; bottom: 6px;
+  transform: rotate(-8deg);
+  border: 2px solid var(--stamp);
+  border-radius: 2px;
+  color: var(--stamp);
+  font-family: "Barlow Semi Condensed", "Noto Sans TC", ui-sans-serif, sans-serif;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .14em;
+  padding: 1px 6px;
+  opacity: .55;
+  pointer-events: none;
+}
+
+/* 開單：看板標題列的按鈕 */
+.newbtn {
+  appearance: none;
+  align-self: center;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  background: var(--ink);
+  color: var(--stock);
+  border: 1px solid var(--ink);
+  border-radius: 2px;
+  font-family: "Barlow Semi Condensed", "Noto Sans TC", ui-sans-serif, sans-serif;
+  font-size: 14.5px;
+  font-weight: 600;
+  letter-spacing: .05em;
+  padding: 0 14px;
+  min-height: 34px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.newbtn:hover { background: var(--stamp); border-color: var(--stamp); }
+.newbtn:focus-visible { outline: 2px solid var(--stamp); outline-offset: 2px; }
+
+/* 手機：改成右下角浮動鈕 */
+.fab { display: none; }
+@media (max-width: 700px) {
+  .newbtn { display: none; }
+  .fab {
+    display: grid;
+    place-items: center;
+    position: fixed;
+    right: 16px;
+    bottom: 16px;
+    z-index: 40;
+    width: 56px;
+    height: 56px;
+    border: 0;
+    border-radius: 50%;
+    background: var(--ink);
+    color: var(--stock);
+    font-family: "Courier Prime", "Noto Sans TC", ui-monospace, monospace;
+    font-size: 26px;
+    line-height: 1;
+    box-shadow: 0 3px 12px rgba(31,28,24,.34);
+    cursor: pointer;
+  }
+  .fab:focus-visible { outline: 3px solid var(--stamp); outline-offset: 2px; }
+}
+
+/* 彈窗：一張待填的空白單 */
+.sheet {
+  width: min(430px, calc(100vw - 32px));
+  padding: 0;
+  border: 1px solid var(--rule);
+  border-top: 3px solid var(--ink);
+  border-radius: 2px;
+  background: var(--stock);
+  color: var(--ink);
+  box-shadow: 0 14px 38px rgba(31,28,24,.34);
+}
+.sheet::backdrop { background: rgba(31,28,24,.44); }
+.sheet-head {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 13px 17px 11px;
+  border-bottom: 1px dashed var(--rule);
+}
+.sheet-head h2,
+.sheet-head .ttl {
+  font-family: "Barlow Semi Condensed", "Noto Sans TC", ui-sans-serif, sans-serif;
+  font-size: 19px;
+  font-weight: 600;
+  letter-spacing: .02em;
+  margin: 0;
+}
+.sheet-no {
+  font-family: "Courier Prime", "Noto Sans TC", ui-monospace, monospace;
+  font-size: 10.5px;
+  letter-spacing: .12em;
+  color: var(--ink-3);
+}
+.sheet form { display: grid; gap: 15px; padding: 15px 17px 17px; }
+.field { display: grid; gap: 4px; }
+.field label {
+  font-family: "Courier Prime", "Noto Sans TC", ui-monospace, monospace;
+  font-size: 12.5px;
+  font-weight: 700;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  color: var(--ink-2);
+}
+/* 必填星號。語意由 <input required> 承擔，星號只是給用看的人的記號，
+   所以 aria-hidden —— 讀屏會唸「必填」，不必再聽到一個孤零零的「星號」。 */
+.req {
+  color: var(--alert);
+  font-size: 14px;
+  margin-left: 3px;
+}
+/* 欄位就是一條可以寫字的線，不是圓角輸入框 */
+.field input,
+.field select,
+.field textarea {
+  appearance: none;
+  width: 100%;
+  background: transparent;
+  border: 0;
+  border-bottom: 1.5px solid var(--ink);
+  border-radius: 0;
+  font-family: "Barlow Semi Condensed", "Noto Sans TC", ui-sans-serif, sans-serif;
+  font-size: 16.5px;
+  color: var(--ink);
+  padding: 6px 2px;
+  min-height: 40px;
+}
+/* [AI assisted 004] 使用者只說「placeholder 太像真實輸入的文字」，
+   由 AI 提出用三個維度同時拉開距離（字形、字級、明度）而不只改文案。
+   placeholder 用斜體、小一號、再淡一階 —— 跟真的輸入內容（正體、16.5px、
+   ink）拉開三個維度的距離。同字級同顏色的 placeholder 會被讀成「這格已經
+   填好了」，是這張表單最容易犯的錯。 */
+.field input::placeholder,
+.field textarea::placeholder {
+  color: var(--ink-3);
+  opacity: .7;
+  font-style: italic;
+  font-size: 14px;
+}
+.field input:focus,
+.field select:focus,
+.field textarea:focus { outline: none; border-bottom-color: var(--stamp); box-shadow: 0 1.5px 0 var(--stamp); }
+/* [AI assisted 004] 使用者要求把「必填」字樣換成紅星、並留下空位給未來的驗證
+   訊息。由 AI 補上的是：選填欄位也一起留（description 有 2000 字上限、dueDate
+   也可能格式錯，那些錯誤同樣需要落點，四欄一致才不會有的跳有的不跳）。
+   提示列平常是空的，但高度先佔住 —— 驗證訊息長出來時版面不會往下跳，
+   使用者的視線也不會被推走。必填與選填靠標題那顆紅星分辨，不再各寫一句
+   「必填」「選填」讓表單自我複述。 */
+.field .hint {
+  font-size: 11.5px;
+  line-height: 1.45;
+  min-height: 17px;
+  color: var(--ink-3);
+}
+.field .hint.warn,
+.field .hint.err { color: var(--alert); }
+/* 驗證沒過：整條線轉紅，不只訊息轉紅 */
+.field.bad input,
+.field.bad select,
+.field.bad textarea { border-bottom-color: var(--alert); }
+
+/* 類別下拉：同一條線，右端自己補一個箭頭 —— appearance: none 會連原生
+   箭頭一起拿掉，沒補的話這個欄位看起來就跟單行輸入框一模一樣。 */
+.selectwrap { position: relative; display: block; }
+.selectwrap::after {
+  content: "";
+  position: absolute;
+  right: 5px;
+  top: 44%;
+  width: 7px;
+  height: 7px;
+  border-right: 1.5px solid var(--ink-2);
+  border-bottom: 1.5px solid var(--ink-2);
+  transform: translateY(-50%) rotate(45deg);
+  pointer-events: none;
+}
+.field select { padding-right: 22px; cursor: pointer; }
+
+/* 說明欄：紙本工單的備註是一塊有橫線的區域，不是一條線。橫線用漸層畫，
+   行高對齊格線間距，字就坐在線上。background-attachment: local 讓格線
+   跟著內容捲動 —— 固定住的話，捲到第二頁時字會跟線錯開。 */
+.field textarea {
+  resize: vertical;
+  min-height: 82px;
+  line-height: 26px;
+  padding: 0 2px;
+  background-image: repeating-linear-gradient(
+    to bottom, transparent 0 25px, var(--rule-2) 25px 26px);
+  background-attachment: local;
+}
+.sheet-foot { display: flex; justify-content: flex-end; gap: 9px; }
+.btn {
+  appearance: none;
+  border-radius: 2px;
+  font-family: "Barlow Semi Condensed", "Noto Sans TC", ui-sans-serif, sans-serif;
+  font-size: 14.5px;
+  font-weight: 600;
+  letter-spacing: .04em;
+  padding: 0 16px;
+  min-height: 40px;
+  cursor: pointer;
+}
+.btn.ghost { background: transparent; color: var(--ink-2); border: 1px solid var(--rule); }
+.btn.ghost:hover { border-color: var(--ink-2); color: var(--ink); }
+.btn.solid { background: var(--ink); color: var(--stock); border: 1px solid var(--ink); }
+.btn.solid:hover { background: var(--stamp); border-color: var(--stamp); }
+.btn:focus-visible { outline: 2px solid var(--stamp); outline-offset: 2px; }
+.btn.danger { background: var(--alert); color: var(--stock); border: 1px solid var(--alert); }
+.btn.danger:hover { background: var(--alert-2); border-color: var(--alert-2); }
+
+/* 刪除確認：同一張紙，抬頭那道線換成紅的 */
+.sheet.confirm { border-top-color: var(--alert); width: min(390px, calc(100vw - 32px)); }
+.confirm-body { display: grid; gap: 12px; padding: 15px 17px 17px; }
+/* 要刪的是哪一張，直接把標題抄在紙上 */
+.confirm-quote {
+  margin: 0;
+  background: var(--alert-bg);
+  border-left: 3px solid var(--alert);
+  padding: 9px 11px;
+  font-family: "Barlow Semi Condensed", "Noto Sans TC", ui-sans-serif, sans-serif;
+  font-size: 16.5px;
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+.confirm-warn { margin: 0; font-size: 12.5px; color: var(--ink-2); }
+
+/* [AI assisted 007] 明細窗（第二聯）是本次新增的畫面，三個關鍵決定與 AI 討論後定案：
+   (1) 卡片手上那一列已經有 description 以外的所有欄位，所以先把整張紙畫出來、
+       只有說明區等 GET /api/tasks/{id}。整張窗不做骨架，版面不會跳。
+   (2) 唯讀。編輯與刪除留在三點選單，不在這裡再放一次，免得 modal 疊 modal。
+   (3) 三格欄位的格線用 1px gap 透出父層底色來畫 —— 換行時不會留下孤兒邊框，
+       也不必為第一格／最後一格各寫一條規則。
+   後來修掉的：這三格原本用 grid 的 auto-fit，窄螢幕只排得下兩欄，第三格掉到
+   第二列，剩下那個沒有內容的格軌就把父層的格線底色整塊透出來 —— 畫面上多一個
+   空的灰色欄位。改成 flex 換行，最後一格自己撐滿整列，餘數不會變成假欄位。 */
+
+/* 明細：從架上抽出來讀的第二聯。比表單窗寬 ——
+   那張是填四個欄位，這張是讀一段文字，需要閱讀寬度。 */
+.sheet.copy {
+  width: min(560px, calc(100vw - 32px));
+  max-height: calc(100dvh - 64px);
+  overflow: hidden;
+  --paper: var(--stock);
+}
+/* display 只在開著的時候給：寫在 .sheet.copy 上會蓋掉 UA 的 dialog:not([open]),
+   關著的窗會直接顯示在頁面上。 */
+.sheet.copy[open] {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+}
+.sheet.copy.done { background: var(--stock-2); border-top-color: var(--stamp); --paper: var(--stock-2); }
+.sheet.copy .sheet-head { align-items: center; }
+.sheet.copy.done .sheet-head .cat { color: var(--stamp); }
+/* 章蓋在抬頭而不是紙的右下角：右下角會壓到說明的最後一行 */
+.copy-chop { position: static; margin-left: auto; transform: rotate(-3deg); font-size: 12px; }
+
+/* 抬頭與頁腳釘住，只有中段捲動 —— 說明上限 2000 字 */
+.copy-body {
+  overflow: auto;
+  display: grid;
+  gap: 14px;
+  align-content: start;
+  padding: 15px 17px 17px;
+}
+.copy-title {
+  margin: 0;
+  font-family: "Barlow Semi Condensed", "Noto Sans TC", ui-sans-serif, sans-serif;
+  font-size: 22px;
+  font-weight: 500;
+  line-height: 1.25;
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+.sheet.copy.done .copy-title { color: var(--ink-2); text-decoration: line-through; text-decoration-color: var(--stamp); text-decoration-thickness: 1.5px; }
+
+/* 狀態、到期日、類別三格。格線是 1px 的 gap 透出來的底色，不是 border。
+   用 flex 換行而不是 grid 的 auto-fit：三格配上窄螢幕的兩欄除不盡，grid 會留下
+   一個沒有內容的格軌，而那塊面積會透出父層的格線底色 —— 畫面上就多出一個空的
+   灰色欄位。flex 換行時最後一格自己撐滿整列，餘數不會變成一個假欄位。 */
+.facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1px;
+  background: var(--rule);
+  border: 1px solid var(--rule);
+  border-radius: 2px;
+}
+.fact { flex: 1 1 128px; min-width: 0; display: grid; gap: 5px; background: var(--stock); padding: 8px 11px 9px; }
+.sheet.copy.done .fact { background: var(--stock-2); }
+.fact .lab {
+  font-family: "Courier Prime", "Noto Sans TC", ui-monospace, monospace;
+  font-size: 9.5px;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+.fact .val {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-family: "Barlow Semi Condensed", "Noto Sans TC", ui-sans-serif, sans-serif;
+  font-size: 15px;
+  color: var(--ink);
+}
+/* 唯讀的方框：借卡片的樣式，但拿掉游標與 44px 命中區 —— 這裡按不下去 */
+.fact .mark { cursor: default; }
+.fact .mark::before { content: none; }
+.sheet.copy.done .fact .mark { border-color: var(--stamp); color: var(--stamp); }
+.sheet.copy.done .fact .mark .tick { border-color: var(--stamp); background: var(--stamp); color: var(--stock); }
+/* 明細印完整年份。卡片省年份是因為「近期工作的年份是雜訊」，這張紙不成立。 */
+.fact .due { font-size: 13.5px; color: var(--ink-2); }
+.fact .due.late { color: var(--alert); }
+/* 手機：標籤與值收成同一列。窄螢幕本來就只排得下兩欄、要換兩列，每格再佔兩行的話
+   這塊 meta 會吃掉半個螢幕，把真正要讀的說明整段推到摺線以下。 */
+@media (max-width: 700px) {
+  .fact {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 3px 8px;
+    padding: 7px 10px 8px;
+  }
+  .fact .val { font-size: 14px; }
+  .fact .due { font-size: 12.5px; }
+}
+
+.desc-head {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin-bottom: 8px;
+  font-family: "Courier Prime", "Noto Sans TC", ui-monospace, monospace;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  color: var(--ink-2);
+}
+.desc-head::after { content: ""; flex: 1; border-top: 1px solid var(--rule); }
+/* pre-wrap：textarea 收得下換行，這裡就得原樣還它 */
+.desc-text {
+  margin: 0;
+  font-size: 15px;
+  line-height: 1.7;
+  color: var(--ink);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+/* 沒填說明，就用 placeholder 那三個維度：斜體、小一號、再淡一階 */
+.desc-text.none { font-style: italic; font-size: 13.5px; color: var(--ink-3); }
+.desc-status {
+  margin: 9px 0 0;
+  font-family: "Courier Prime", "Noto Sans TC", ui-monospace, monospace;
+  font-size: 11px;
+  letter-spacing: .06em;
+  color: var(--ink-3);
+}
+
+.copy-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 11px 17px 13px;
+  border-top: 1px dashed var(--rule);
+}
+.copy-meta {
+  display: grid;
+  gap: 2px;
+  font-family: "Courier Prime", "Noto Sans TC", ui-monospace, monospace;
+  font-size: 11px;
+  letter-spacing: .04em;
+  color: var(--ink-3);
+  font-variant-numeric: tabular-nums;
+}
+.copy-meta b { font-weight: 400; color: var(--ink-2); }
+
+/* 02 區的靜態縮圖版：同一套 class，拿掉視窗尺寸 */
+.sheet.copy.static { width: auto; max-height: none; box-shadow: none; }
+.sheet.copy.static .sheet-head { padding: 10px 13px 9px; }
+.sheet.copy.static .copy-body { padding: 12px 13px 14px; gap: 11px; }
+.sheet.copy.static .copy-foot { padding: 9px 13px 11px; }
+.sheet.copy.static .copy-title { font-size: 17px; }
+.sheet.copy.static .fact .val { font-size: 13px; }
+.sheet.copy.static .desc-text { font-size: 13px; line-height: 1.6; }
+
+/* 02 區的靜態縮圖 */
+.minisheet {
+  background: var(--stock);
+  border: 1px solid var(--rule);
+  border-top: 3px solid var(--ink);
+  border-radius: 2px;
+  padding: 11px 12px 13px;
+  display: grid;
+  gap: 12px;
+}
+.minisheet .lab {
+  display: block;
+  font-family: "Courier Prime", "Noto Sans TC", ui-monospace, monospace;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  color: var(--ink-2);
+  margin-bottom: 3px;
+}
+.minisheet .lab .req { font-size: 12px; }
+.minisheet .line {
+  border-bottom: 1.5px solid var(--ink);
+  padding-bottom: 4px;
+  font-family: "Barlow Semi Condensed", "Noto Sans TC", ui-sans-serif, sans-serif;
+  font-size: 15px;
+}
+.minisheet .line.dim { color: var(--ink-3); opacity: .7; font-style: italic; border-bottom-color: var(--rule); }
+/* 縮圖裡的下拉列與說明格線，比照彈窗本體 */
+.minisheet .line.pick { position: relative; padding-right: 18px; }
+.minisheet .line.pick::after {
+  content: "";
+  position: absolute;
+  right: 3px;
+  top: 5px;
+  width: 6px;
+  height: 6px;
+  border-right: 1.5px solid var(--ink-2);
+  border-bottom: 1.5px solid var(--ink-2);
+  transform: rotate(45deg);
+}
+.minisheet .lines {
+  height: 44px;
+  border-bottom: 1.5px solid var(--ink);
+  background-image: repeating-linear-gradient(
+    to bottom, transparent 0 21px, var(--rule-2) 21px 22px);
+}
+.minisheet .mini-head {
+  display: flex;
+  align-items: baseline;
+  gap: 9px;
+  padding-bottom: 9px;
+  border-bottom: 1px dashed var(--rule);
+  font-family: "Barlow Semi Condensed", "Noto Sans TC", ui-sans-serif, sans-serif;
+  font-size: 16px;
+  font-weight: 600;
+}
+/* 抬頭那顆是單號，不是欄位名 —— 單號的 category 段在契約裡就是小寫，
+   不能被欄位標籤那條 text-transform 轉成 BUG-0012。 */
+.minisheet .mini-head .lab { margin: 0; text-transform: none; }
+.minisheet.confirm-mini { border-top-color: var(--alert); gap: 10px; }
+.mini-foot { display: flex; justify-content: flex-end; gap: 8px; }
+.mini-foot .btn { display: inline-flex; align-items: center; font-size: 13px; min-height: 34px; padding: 0 13px; }
+
+.empty {
+  font-family: "Courier Prime", "Noto Sans TC", ui-monospace, monospace;
+  font-size: 11.5px;
+  letter-spacing: .06em;
+  color: var(--ink-2);
+  text-align: center;
+  padding: 22px 8px;
+  border: 1px dashed var(--tray-edge);
+  border-radius: 2px;
+}
+
+/* ---------- 狀態規格 ---------- */
+
+.specs {
+  columns: 288px;
+  column-gap: 16px;
+}
+.spec { break-inside: avoid; padding-bottom: 20px; }
+.spec > figcaption {
+  font-family: "Courier Prime", "Noto Sans TC", ui-monospace, monospace;
+  font-size: 10.5px;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--ink-2);
+  margin-bottom: 6px;
+  border-bottom: 1px solid var(--tray-edge);
+  padding-bottom: 3px;
+}
+.spec p { margin: 6px 0 0; font-size: 12.5px; color: var(--ink-2); }
+.spec .docket { cursor: default; }
+.spec .kill { opacity: 1; }
+
+.skel {
+  height: 11px;
+  background: var(--rule-2);
+  border-radius: 1px;
+}
+.skel.w70 { width: 70%; }
+.skel.w45 { width: 45%; margin-top: 7px; }
+.skel.w60 { width: 60%; margin-top: 7px; }
+
+.fail {
+  border: 1px solid var(--alert);
+  background: var(--alert-bg);
+  border-radius: 2px;
+  padding: 9px 11px;
+}
+.fail strong {
+  display: block;
+  font-family: "Barlow Semi Condensed", "Noto Sans TC", ui-sans-serif, sans-serif;
+  font-size: 15px;
+  color: var(--alert);
+  letter-spacing: .01em;
+}
+.fail span { font-size: 12.5px; color: var(--ink-2); }
+.fail button {
+  margin-top: 6px;
+  appearance: none;
+  background: transparent;
+  border: 1px solid var(--alert);
+  border-radius: 2px;
+  color: var(--alert);
+  font-family: "Courier Prime", "Noto Sans TC", ui-monospace, monospace;
+  font-size: 10.5px;
+  letter-spacing: .06em;
+  padding: 4px 9px;
+  min-height: 28px;
+  cursor: pointer;
+}
+
+/* ---------- 手機 ---------- */
+
+.phonewrap { display: flex; flex-wrap: wrap; gap: 26px; align-items: flex-start; }
+.phone {
+  position: relative;
+  width: 375px;
+  max-width: 100%;
+  flex: 0 0 auto;
+  background: var(--desk);
+  border: 1.5px solid var(--ink);
+  padding: 12px 12px 66px;
+}
+.phone .seg {
+  display: flex;
+  border: 1.5px solid var(--ink);
+  margin-bottom: 10px;
+}
+.phone .seg span {
+  flex: 1;
+  text-align: center;
+  font-family: "Courier Prime", "Noto Sans TC", ui-monospace, monospace;
+  font-size: 11px;
+  letter-spacing: .04em;
+  padding: 9px 2px;
+  min-height: 40px;
+  color: var(--ink-2);
+  white-space: nowrap;
+}
+.phone .seg span.on { background: var(--ink); color: var(--stock); }
+.phone .seg span + span { border-left: 1.5px solid var(--ink); }
+.phone .stack { gap: 8px; }
+.phone-fab {
+  position: absolute;
+  right: 14px;
+  bottom: 14px;
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background: var(--ink);
+  color: var(--stock);
+  display: grid;
+  place-items: center;
+  font-family: "Courier Prime", "Noto Sans TC", ui-monospace, monospace;
+  font-size: 24px;
+  line-height: 1;
+  box-shadow: 0 3px 12px rgba(31,28,24,.34);
+}
+.phone .kill { opacity: 1; }
+
+.a11y { flex: 1 1 300px; min-width: 260px; margin: 0; padding: 0; list-style: none; }
+.a11y li {
+  border-top: 1px solid var(--tray-edge);
+  padding: 10px 0;
+  font-size: 13.5px;
+  color: var(--ink-2);
+}
+.a11y li:last-child { border-bottom: 1px solid var(--tray-edge); }
+.a11y b {
+  display: block;
+  font-family: "Barlow Semi Condensed", "Noto Sans TC", ui-sans-serif, sans-serif;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--ink);
+  letter-spacing: .01em;
+}
+
+/* ---------- token / 表格 ---------- */
+
+.tokens {
+  background: var(--stock);
+  border: 1px solid var(--rule);
+  border-left: 3px solid var(--stamp);
+  border-radius: 2px;
+  padding: 14px 16px;
+  overflow-x: auto;
+}
+.tokens pre {
+  margin: 0;
+  font-family: "Courier Prime", "Noto Sans TC", ui-monospace, monospace;
+  font-size: 12px;
+  line-height: 1.75;
+  color: var(--ink-2);
+}
+.tokens .c { color: var(--ink-3); }
+.tokens .k { color: var(--stamp); }
+
+.swatches {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+  gap: 8px;
+  margin-top: 14px;
+}
+.sw {
+  border: 1px solid var(--rule);
+  border-radius: 2px;
+  overflow: hidden;
+  background: var(--stock);
+}
+.sw i { display: block; height: 34px; }
+.sw span {
+  display: block;
+  font-family: "Courier Prime", "Noto Sans TC", ui-monospace, monospace;
+  font-size: 9.5px;
+  letter-spacing: .04em;
+  color: var(--ink-2);
+  padding: 4px 5px;
+  border-top: 1px solid var(--rule);
+}
+
+.tablebox { overflow-x: auto; border: 1px solid var(--rule); border-radius: 2px; background: var(--stock); }
+table { border-collapse: collapse; width: 100%; min-width: 560px; }
+th, td {
+  text-align: left;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--rule-2);
+  font-size: 13px;
+  color: var(--ink-2);
+  vertical-align: top;
+}
+th {
+  font-family: "Courier Prime", "Noto Sans TC", ui-monospace, monospace;
+  font-size: 10.5px;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  border-bottom: 1.5px solid var(--ink);
+  white-space: nowrap;
+}
+tbody tr:last-child td { border-bottom: 0; }
+td code, th code, p code, li code {
+  font-family: "Courier Prime", "Noto Sans TC", ui-monospace, monospace;
+  font-size: 12px;
+  color: var(--ink);
+  background: var(--stock-2);
+  padding: 0 3px;
+}
+td:first-child code { color: var(--stamp); background: transparent; padding: 0; font-weight: 700; }
+
+.note {
+  font-size: 13px;
+  color: var(--ink-2);
+  margin: 14px 0 0;
+  max-width: 74ch;
+}
+.note b {
+  font-family: "Barlow Semi Condensed", "Noto Sans TC", ui-sans-serif, sans-serif;
+  font-size: 15px;
+  color: var(--ink);
+}
+
+.colophon {
+  margin-top: 54px;
+  border-top: 2px solid var(--ink);
+  padding-top: 10px;
+  font-family: "Courier Prime", "Noto Sans TC", ui-monospace, monospace;
+  font-size: 10.5px;
+  letter-spacing: .06em;
+  color: var(--ink-3);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 20px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * { animation: none !important; transition: none !important; }
+}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+
+  <header class="masthead">
+    <div class="plate"><h1>任務管理應用程式</h1></div>
+    <div class="mast-rule" aria-hidden="true"></div>
+  </header>
+
+  <!-- 01 看板 -->
+  <section class="sec">
+    <div class="sec-head">
+      <span class="sec-no">01</span>
+      <h2>看板 / Board</h2>
+      <button type="button" class="newbtn" data-open><span aria-hidden="true">＋</span>新增工單</button>
+    </div>
+
+    <div class="board">
+      <div class="tray" data-tray="open">
+        <div class="tray-head">
+          <h3>未完成</h3>
+          <span class="tally" data-tally="open">0</span>
+          <span class="tray-hint">In Tray</span>
+        </div>
+        <div class="stack" data-stack="open"></div>
+      </div>
+
+      <div class="tray" data-tray="done">
+        <div class="tray-head">
+          <h3>已完成</h3>
+          <span class="tally" data-tally="done">0</span>
+          <span class="tray-hint">Out Tray</span>
+        </div>
+        <div class="stack" data-stack="done"></div>
+      </div>
+    </div>
+
+    <dialog class="sheet" data-sheet aria-labelledby="sheet-title">
+      <div class="sheet-head">
+        <span class="sheet-no" data-sheetno>NEW</span>
+        <h2 id="sheet-title" data-sheetheading>新增工單</h2>
+      </div>
+      <!-- [AI assisted 004] 使用 AI 協助把契約已定案的 category 與 description
+           補進表單，並依使用者指示改成「紅星標必填、選填不寫字、每欄下方留一列
+           訊息位」。標題的 maxlength 原本是 120，與契約的 200 對不上，一併修正。 -->
+      <form data-sheetform novalidate>
+        <div class="field" data-field="title">
+          <label for="f-title">標題<span class="req" aria-hidden="true">*</span></label>
+          <input id="f-title" type="text" maxlength="200" required
+                 placeholder="一句話說清楚要做什麼" autocomplete="off"
+                 aria-describedby="f-title-msg">
+          <span class="hint" id="f-title-msg" aria-live="polite"></span>
+        </div>
+        <div class="field" data-field="cat">
+          <label for="f-cat">類別<span class="req" aria-hidden="true">*</span></label>
+          <span class="selectwrap">
+            <select id="f-cat" required aria-describedby="f-cat-msg">
+              <option value="bug">bug — 修復</option>
+              <option value="feat">feat — 新功能</option>
+            </select>
+          </span>
+          <span class="hint" id="f-cat-msg" data-cathint aria-live="polite"></span>
+        </div>
+        <div class="field" data-field="desc">
+          <label for="f-desc">說明</label>
+          <textarea id="f-desc" rows="3" maxlength="2000"
+                    placeholder="細節、重現步驟、怎樣算做完"
+                    aria-describedby="f-desc-msg"></textarea>
+          <span class="hint" id="f-desc-msg" aria-live="polite"></span>
+        </div>
+        <div class="field" data-field="due">
+          <label for="f-due">到期日</label>
+          <input id="f-due" type="date" aria-describedby="f-due-msg">
+          <span class="hint" id="f-due-msg" aria-live="polite"></span>
+        </div>
+        <div class="sheet-foot">
+          <button type="button" class="btn ghost" data-cancel>取消</button>
+          <button type="submit" class="btn solid" data-submit>確定</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog class="sheet confirm" data-confirm role="alertdialog"
+            aria-labelledby="confirm-title" aria-describedby="confirm-warn">
+      <div class="sheet-head">
+        <span class="sheet-no" data-cno>bug-0000</span>
+        <h2 id="confirm-title">刪除工單</h2>
+      </div>
+      <div class="confirm-body">
+        <p class="confirm-quote" data-ctitle></p>
+        <p class="confirm-warn" id="confirm-warn">單子會從架上撤掉，這個動作無法復原。</p>
+        <div class="sheet-foot">
+          <button type="button" class="btn ghost" data-ccancel>取消</button>
+          <button type="button" class="btn danger" data-cok>確定</button>
+        </div>
+      </div>
+    </dialog>
+
+    <!-- [AI assisted 007] 使用 AI 協助設計這張明細窗。唯讀、只有「關閉」是使用者
+         的裁示；由 AI 補上的是「先用架上那一列把整張紙畫出來，只有說明區等
+         GET /api/tasks/{id}」這個順序 —— 契約裡 Task 就是 TaskSummary 加一個
+         description，卡片手上已經有其餘全部欄位，沒有理由讓整張窗一起等。
+         tabindex="-1" 是為了讓焦點能落在窗本身：這是一張用來讀的紙，不是一個
+         要下決定的問句，焦點丟到「關閉」等於先把人帶到出口。 -->
+    <dialog class="sheet copy" data-copy aria-labelledby="copy-title" tabindex="-1">
+      <div class="sheet-head">
+        <span class="cat" data-copycat aria-hidden="true"><span>B</span></span>
+        <span class="sheet-no" data-copyno>bug-0012</span>
+        <h2 id="copy-title">工單明細</h2>
+        <span class="chop copy-chop" data-copychop hidden>完成 DONE</span>
+      </div>
+
+      <div class="copy-body">
+        <p class="copy-title" data-copytitle></p>
+
+        <div class="facts">
+          <div class="fact">
+            <span class="lab">狀態</span>
+            <span class="val" data-copystate></span>
+          </div>
+          <div class="fact">
+            <span class="lab">到期日</span>
+            <span class="val" data-copydue></span>
+          </div>
+          <div class="fact">
+            <span class="lab">類別</span>
+            <span class="val" data-copycatname></span>
+          </div>
+        </div>
+
+        <div>
+          <div class="desc-head">說明</div>
+          <!-- aria-busy 蓋在整塊上；aria-live 只給下面那一行狀態字。掛在內文上的話，
+               說明一到就會把整段唸出來，而那可能是 2000 字。
+               狀態列常駐在 DOM 裡、只換字 —— 整塊連元素一起塞進去的 live region，
+               很多讀屏軟體不會唸。失敗時的 role="alert" 則相反，插進來就會唸。 -->
+          <div data-copydesc aria-busy="false"></div>
+          <p class="desc-status" data-copystatus role="status"></p>
+        </div>
+      </div>
+
+      <div class="copy-foot">
+        <div class="copy-meta">
+          <span>開單 <b data-copycreated>—</b></span>
+          <span>異動 <b data-copyupdated>—</b></span>
+        </div>
+        <button type="button" class="btn ghost" data-copyclose>關閉</button>
+      </div>
+    </dialog>
+  </section>
+
+  <!-- 02 狀態 -->
+  <section class="sec">
+    <div class="sec-head">
+      <span class="sec-no">02</span>
+      <h2>狀態規格 / States</h2>
+      <p class="sec-note">每個狀態都有形狀差異，不只有顏色差異。</p>
+    </div>
+
+    <div class="specs">
+      <figure class="spec" style="margin:0">
+        <figcaption>未完成 / Open</figcaption>
+        <div class="docket">
+          <div class="stub"><span class="cat" data-cat="bug" aria-hidden="true"><span>B</span></span><code>bug-0012</code></div>
+          <div class="body">
+            <p class="title">補上 CORS 設定，讓 5173 打得到 8080</p>
+            <div class="foot">
+              <span class="mark"><span class="tick">✓</span>未完成</span>
+              <span class="due">09/07</span>
+            </div>
+          </div>
+          <span class="menubtn" aria-hidden="true"><i></i><i></i><i></i></span>
+        </div>
+        <p>存根用中性紙色，方框全空，沒有蓋章。卡片上唯一的操作入口是右上角的三點鈕，其餘留白給標題。存根頂端是類別記號：<b>實心是 <code>bug</code>、空心是 <code>feat</code></b>，底下直排印完整單號。</p>
+      </figure>
+
+      <figure class="spec" style="margin:0">
+        <figcaption>逾期 / Overdue</figcaption>
+        <div class="docket overdue">
+          <div class="stub"><span class="cat" data-cat="feat" aria-hidden="true"><span>F</span></span><code>feat-0004</code></div>
+          <div class="body">
+            <p class="title">README 補上領域模型與規格存取方式</p>
+            <div class="foot">
+              <span class="mark"><span class="tick">✓</span>未完成</span>
+              <span class="due late">09/04</span>
+            </div>
+          </div>
+          <span class="menubtn" aria-hidden="true"><i></i><i></i><i></i></span>
+        </div>
+        <p>整條存根轉紅，日期加粗，另掛「逾期」文字標籤。逾期是疊加在「未完成」上的狀態，蓋章之後就不再顯示。</p>
+      </figure>
+
+      <figure class="spec" style="margin:0">
+        <figcaption>已完成 / Done</figcaption>
+        <div class="docket done">
+          <div class="stub"><span class="cat" data-cat="feat" aria-hidden="true"><span>F</span></span><code>feat-0002</code></div>
+          <div class="body">
+            <p class="title">專案骨架：Maven wrapper + Vite 初始化</p>
+            <div class="foot">
+              <span class="mark"><span class="tick">✓</span>已完成</span>
+              <span class="due">09/01</span>
+            </div>
+          </div>
+          <span class="menubtn" aria-hidden="true"><i></i><i></i><i></i></span>
+          <span class="chop">完成 DONE</span>
+        </div>
+        <p>換第二聯紙色，蓋完成章，刪除線用印油紫而非灰。</p>
+      </figure>
+
+      <figure class="spec" style="margin:0">
+        <figcaption>載入中 / Loading</figcaption>
+        <div class="docket" aria-busy="true">
+          <div class="stub"><span class="cat" aria-hidden="true"></span><code>· · · ·</code></div>
+          <div class="body">
+            <div class="skel w70"></div>
+            <div class="skel w45"></div>
+            <div class="foot" style="margin-top:9px"><span class="mark" style="opacity:.4"><span class="tick"></span>———</span></div>
+          </div>
+        </div>
+        <p>骨架維持工單版型，不用轉圈圖示，避免版面在載入完成時跳動。類別記號留一個虛線空框佔位 —— 單號與類別都還沒回來，但位置先站住，資料到齊時不會把標題往下推。</p>
+      </figure>
+
+      <figure class="spec" style="margin:0">
+        <figcaption>失敗 / Failed</figcaption>
+        <div class="fail">
+          <strong>這張單子沒存進去</strong>
+          <span>伺服器回 500。你剛才改的字還留著，按重試會再送一次。</span>
+          <button type="button">重試</button>
+        </div>
+        <p>樂觀更新失敗就回滾並保留使用者輸入，錯誤訊息說明「怎麼辦」而不是道歉。</p>
+      </figure>
+
+      <figure class="spec" style="margin:0">
+        <figcaption>開單 · 改單 / One sheet</figcaption>
+        <div class="minisheet">
+          <div class="mini-head"><span class="lab">bug-0012</span>編輯工單</div>
+          <div><span class="lab">標題<span class="req">*</span></span><div class="line">補上 CORS 設定，讓 5173 打得到 8080</div></div>
+          <div><span class="lab">類別<span class="req">*</span></span><div class="line pick">bug — 修復</div></div>
+          <div><span class="lab">說明</span><div class="lines"></div></div>
+          <div><span class="lab">到期日</span><div class="line dim">年 / 月 / 日</div></div>
+        </div>
+        <p>新增與編輯共用同一張彈窗：新開時抬頭是 <code>NEW</code>、標題寫「新增工單」，編輯時抬頭換成單號、標題換成「編輯工單」。模式差異全部收在抬頭，底下一律是取消／確定；欄位規則只寫一次，<code>POST</code> 與 <code>PUT</code> 各送各的。四個欄位，<b>必填靠標題右邊那顆紅星表示</b>，不再逐欄寫「必填」「選填」讓表單自我複述；沒有星號就是可以留空。<b>每個欄位下方留一列空白</b>，那是驗證訊息的位置 —— 先把高度佔住，訊息長出來時版面不會往下跳，使用者的視線也不會被推走。<b>說明是有橫線的一塊區域而不是一條線</b>，版型本身就在說這格可以寫長一點。<b>placeholder 用斜體、小一號、再淡一階</b>，跟真的輸入內容拉開三個維度的距離 —— 同字級同顏色的 placeholder 會被讀成「這格已經填好了」。<b>在編輯模式改類別會重新發號</b>，那一列空白就換成「重新發號：<code>feat-0004</code> → <code>bug-0013</code>」，把換號講在按下確定之前。</p>
+      </figure>
+
+      <figure class="spec" style="margin:0">
+        <figcaption>工單明細 / Detail</figcaption>
+        <div class="sheet copy static">
+          <div class="sheet-head">
+            <span class="cat" data-cat="bug" aria-hidden="true"><span>B</span></span>
+            <span class="sheet-no">bug-0012</span>
+            <span class="ttl">工單明細</span>
+          </div>
+          <div class="copy-body">
+            <p class="copy-title">補上 CORS 設定，讓 5173 打得到 8080</p>
+            <div class="facts">
+              <div class="fact">
+                <span class="lab">狀態</span>
+                <span class="val"><span class="mark"><span class="tick" aria-hidden="true">✓</span>未完成</span></span>
+              </div>
+              <div class="fact">
+                <span class="lab">到期日</span>
+                <span class="val"><span class="due">2026-09-07</span></span>
+              </div>
+              <div class="fact">
+                <span class="lab">類別</span>
+                <span class="val"><span class="cat" data-cat="bug" aria-hidden="true"><span>B</span></span>bug — 修復</span>
+              </div>
+            </div>
+            <div>
+              <div class="desc-head">說明</div>
+              <p class="desc-text">Vite dev server 在 5173、後端在 8080，預檢請求被擋掉。</p>
+            </div>
+          </div>
+          <div class="copy-foot">
+            <div class="copy-meta">
+              <span>開單 <b>2026-09-05 09:12</b></span>
+              <span>異動 <b>2026-09-05 09:12</b></span>
+            </div>
+            <span class="btn ghost" style="min-height:32px;font-size:13px;padding:0 13px;display:inline-flex;align-items:center">關閉</span>
+          </div>
+        </div>
+        <p>點卡片抽出來的<b>第二聯</b>，<b>唯讀</b>。看板上唯一讀得到 <code>description</code> 的地方 —— 卡片正面仍然一個字都不放。<b>比表單彈窗寬</b>（560 對 430）：那張是填四個欄位，這張是讀一段文字。<b>三格欄位的格線是 1px 的 gap 透出底色畫的</b>，不是 border，換行時不會留下孤兒邊框；排列用 flex 換行而不是 grid 的 <code>auto-fit</code> —— 三格配上窄螢幕的兩欄除不盡，grid 會留下一個沒有內容的格軌，那塊面積會把父層的格線底色整塊透出來，看起來就是多一個空的灰色欄位，<b>flex 換行時最後一格會自己撐滿整列</b>。<b>窄螢幕再把標籤與值收成同一列</b>：本來就要換兩列，每格再佔兩行的話這塊 meta 會吃掉半個螢幕，把真正要讀的說明整段推到摺線以下。到期日<b>印完整年份</b> —— 卡片省年份是因為「近期工作的年份是雜訊」，一張攤開來讀的單子不成立。頁腳的開單／異動時間<b>只在這裡出現</b>。已完成時整張換第二聯紙色、抬頭那道線轉印油紫、章蓋在抬頭右邊（不蓋右下角，那裡會壓到說明的最後一行）。底下<b>只有「關閉」</b>：改與刪留在三點選單，一個 Esc 的距離，不在這裡再開一次 modal。</p>
+      </figure>
+
+      <figure class="spec" style="margin:0">
+        <figcaption>明細 · 說明未達 / Detail pending</figcaption>
+        <div class="sheet copy static">
+          <div class="copy-body">
+            <div>
+              <div class="desc-head">說明</div>
+              <div class="skel w70"></div>
+              <div class="skel w45"></div>
+              <div class="skel w60"></div>
+              <p class="desc-status">正在取回第二聯…</p>
+            </div>
+            <div class="fail">
+              <strong>第二聯調不出來</strong>
+              <span>伺服器回 500。單子其餘欄位是架上那一份，只有說明沒到。</span>
+              <button type="button">重試</button>
+            </div>
+          </div>
+        </div>
+        <p>兩者擇一，都<b>只發生在說明這一塊</b>。窗一開就用架上那一列把整張紙畫滿（單號、標題、狀態、到期日、類別、時間戳全在手上），只有 <code>description</code> 要等 <code>GET /api/tasks/{id}</code> —— 契約裡 <code>Task</code> 就是 <code>TaskSummary</code> 加一個 <code>description</code>，沒有理由讓整張窗一起等，也就<b>不需要整窗骨架</b>。失敗時其餘欄位照樣讀得到，錯誤說的是「缺哪一塊」而不是「這張單子壞了」。<b>失敗不走看板那條錯誤橫幅</b> —— 橫幅在 modal 後面，人看不到。<b>01 節的原型可以按出來</b>：<code>bug-0009</code> 第一次開必定失敗，按「重試」就會成功。</p>
+      </figure>
+
+      <figure class="spec" style="margin:0">
+        <figcaption>單子選單 / Row menu</figcaption>
+        <div class="rowmenu static">
+          <div class="rowmenu-no">bug-0012</div>
+          <span class="m-edit"><span class="g" aria-hidden="true">✎</span>編輯</span>
+          <span class="m-del"><span class="g" aria-hidden="true">×</span>刪除</span>
+        </div>
+        <p>兩個動作都收進選單，卡片正面只剩內容。面板第一行印單號 —— 選單開在 top layer、視覺上脫離卡片，得讓人知道現在動的是哪一張。</p>
+      </figure>
+
+      <figure class="spec" style="margin:0">
+        <figcaption>刪除確認 / Confirm</figcaption>
+        <div class="minisheet confirm-mini">
+          <div class="mini-head"><span class="lab">bug-0012</span>刪除工單</div>
+          <p class="confirm-quote">補上 CORS 設定，讓 5173 打得到 8080</p>
+          <p class="confirm-warn">單子會從架上撤掉，這個動作無法復原。</p>
+          <div class="mini-foot"><span class="btn ghost">取消</span><span class="btn danger">確定</span></div>
+        </div>
+        <p>刪除緊鄰編輯，按錯的代價又不可逆，所以再問一次。彈窗裡抄出單號與標題 —— 要確認的是「這一張」，不是泛稱的「這個項目」。按鈕維持全站一致的取消／確定，這一張的性質改由抬頭那道紅線、紅底送出鈕與正上方的警告句承擔。</p>
+      </figure>
+
+      <figure class="spec" style="margin:0">
+        <figcaption>空架 / Empty</figcaption>
+        <div class="empty">架上沒有單子 —— 按「新增工單」開一張</div>
+        <p>空狀態指向下一個動作，不放插圖。兩個架各有各自的空狀態文案。</p>
+      </figure>
+    </div>
+  </section>
+
+  <!-- 03 手機 -->
+  <section class="sec">
+    <div class="sec-head">
+      <span class="sec-no">03</span>
+      <h2>375px 與無障礙</h2>
+      <p class="sec-note">兩欄在窄螢幕還是太擠：改成分段切換一次看一架，開單移到右下角的浮動按鈕。</p>
+    </div>
+
+    <div class="phonewrap">
+      <div class="phone">
+        <div class="seg" role="group" aria-label="架別">
+          <span class="on">未完成 6</span>
+          <span>已完成 3</span>
+        </div>
+        <div class="stack">
+          <div class="docket overdue">
+            <div class="stub"><span class="cat" data-cat="feat" aria-hidden="true"><span>F</span></span><code>feat-0004</code></div>
+            <div class="body">
+              <p class="title">README 補上領域模型與規格存取方式</p>
+              <div class="foot">
+                <span class="mark"><span class="tick">✓</span>未完成</span>
+                <span class="due late">09/04</span>
+              </div>
+            </div>
+            <span class="menubtn" aria-hidden="true"><i></i><i></i><i></i></span>
+          </div>
+          <div class="docket">
+            <div class="stub"><span class="cat" data-cat="bug" aria-hidden="true"><span>B</span></span><code>bug-0012</code></div>
+            <div class="body">
+              <p class="title">補上 CORS 設定，讓 5173 打得到 8080</p>
+              <div class="foot">
+                <span class="mark"><span class="tick">✓</span>未完成</span>
+                <span class="due">09/07</span>
+              </div>
+            </div>
+            <span class="menubtn" aria-hidden="true"><i></i><i></i><i></i></span>
+          </div>
+        </div>
+        <span class="phone-fab" aria-hidden="true">＋</span>
+      </div>
+
+      <ul class="a11y">
+        <li><b>拖曳一定要有鍵盤等價操作</b>指標拖曳無法用鍵盤完成（WCAG 2.1.1）。所以每張單子的方框按鈕本身就是切換：未完成 ⇄ 已完成，Tab 走得到、Enter 可按，兩架都到得了。拖曳只是加速手段而非唯一手段。</li>
+        <li><b>方框視覺 24px、點擊區 44×44</b>方框本體維持工單的細緻比例，靠 padding 與 <code>::before</code> 撐開實際命中區到 44×44。</li>
+        <li><b>編輯是真的表單，不是可寫的段落</b>標題不再是 <code>contenteditable</code>。<code>contenteditable</code> 在讀屏軟體上的行為各家不一，而且它把「一段文字」偽裝成輸入框；改成選單的「編輯」開啟同一張彈窗後，鍵盤使用者拿到的是有 <code>&lt;label&gt;</code>、有錯誤訊息、Esc 可退出的正規表單。<b>必填的語意由 <code>required</code> 承擔，紅星只是給用看的人的記號</b>，所以星號 <code>aria-hidden</code> —— 讀屏會唸「必填」，不必再聽到一個孤零零的「星號」。訊息列用 <code>aria-live="polite"</code> 並以 <code>aria-describedby</code> 綁回欄位，錯誤出現時唸得到，也不會打斷正在輸入的人。</li>
+        <li><b>選單用原生 <code>popover</code></b>點外面自動關、Esc 可關、關閉後焦點回到三點鈕，而且面板開在 top layer，不會被托盤裁掉或被下一張單子蓋住。三點鈕視覺 26px、靠 <code>::before</code> 把命中區撐到 44×44，且常駐不靠 hover —— 觸控裝置沒有 hover。</li>
+        <li><b>狀態不只用顏色</b>紫色配全填方框、刪除線與「完成」章，紅色配「逾期」文字標籤（WCAG 1.4.1）。把顏色全部拿掉，靠方框與蓋章的形狀仍然分得出來。<b>類別也走同一條線</b>：存根頂端的記號用實心（<code>bug</code>）對空心（<code>feat</code>）的形狀差異，不另開一組類別色 —— 卡片上的顏色已經被逾期與完成用掉，第三條色軸會跟它們搶注意力。記號對讀屏是冗餘的（底下的單號本來就印著 <code>bug</code>／<code>feat</code>），所以整塊 <code>aria-hidden</code>。</li>
+        <li><b>彈窗用原生 <code>&lt;dialog&gt;</code></b>焦點鎖在彈窗內、Esc 可關、關閉後焦點自動回到剛才那顆按鈕 —— 這些瀏覽器已經做好，不必自己接。手機浮動鈕 56×56、距邊 16px，且不壓到最後一張單子。</li>
+        <li><b>整張卡片可點，但無障礙樹只多一顆按鈕</b>標題本身是 <code>&lt;button&gt;</code>，用 <code>::after</code> 把感應區撐滿整張卡（stretched link）。整張 <code>.docket</code> 掛 click 會做出巢狀互動元素，方框與三點鈕還得靠 <code>stopPropagation</code> 補救；改成這樣，那兩顆是按鈕的<b>兄弟節點</b>，不必攔任何事件。<code>aria-label</code> 把單號墊在前面，可見的標題整段包含在內（WCAG 2.5.3）。焦點框畫在覆蓋層上，框住的是真正可按的範圍。拖曳與點擊不必自己分辨 —— 原生 DnD 完成一次拖曳後就不會再派 click。<b>代價寫在這裡</b>：覆蓋層蓋住整張卡，卡片上的文字選不起來。</li>
+        <li><b>明細是拿來讀的，所以焦點落在窗本身</b>明細窗宣告成一般 <code>&lt;dialog&gt;</code>（不是 <code>alertdialog</code> —— 沒有危險也沒有決定要下），開啟時把焦點放在窗上（<code>tabindex="-1"</code>）而不是「關閉」；WAI-ARIA APG 對「內容為主」的彈窗就是這樣建議，焦點丟到「關閉」等於一開場先把人帶到出口。說明還沒到時，那一塊掛 <code>aria-busy</code>，<b><code>aria-live</code> 只給下面那一行狀態字</b> —— 掛在內文上的話，說明一到就會把整段唸出來，而那可能是 2000 字。狀態列常駐在 DOM 裡只換字（整塊連元素一起塞進去的 live region，很多讀屏軟體不會唸）；失敗那塊則相反，用 <code>role="alert"</code>，插進來就會唸。</li>
+        <li><b>破壞性動作不能是預設焦點</b>刪除確認宣告成 <code>role="alertdialog"</code> 並用 <code>aria-describedby</code> 指向警告句，開啟時整段會唸出來。焦點預設落在「取消」而不是「確定」，Esc 也等同取消 —— 順手一個 Enter 不該把單子刪掉。</li>
+        <li><b>長標題換行不裁切</b><code>overflow-wrap: anywhere</code>，永遠不用 ellipsis。單子的高度由內容決定。</li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- 04 token -->
+  <section class="sec">
+    <div class="sec-head">
+      <span class="sec-no">04</span>
+      <h2>Design Tokens</h2>
+      <p class="sec-note">已貼進 <code>frontend/src/style.css</code> 的 <code>@theme</code>，前端以這一節為準。</p>
+    </div>
+
+    <div class="tokens">
+<pre><span class="c">/* 單一主題。對比度皆以 --color-stock 為底計算，全數通過 WCAG AA */</span>
+<span class="k">--color-desk</span>:    #BFBCB1;   <span class="c">/* 工作檯 */</span>
+<span class="k">--color-tray</span>:    #B2AEA2;   <span class="c">/* 凹陷托盤 */</span>
+<span class="k">--color-tray-edge</span>:#9E9A8E;   <span class="c">/* 托盤邊緣、空架虛線 */</span>
+<span class="k">--color-stock</span>:   #F0EEE7;   <span class="c">/* 單據紙 */</span>
+<span class="k">--color-stock-2</span>: #E3E0D6;   <span class="c">/* 第二聯／已歸檔 */</span>
+<span class="k">--color-stub</span>:    #E7E4DA;   <span class="c">/* 存根 */</span>
+<span class="k">--color-rule</span>:    #C8C3B6;   <span class="c">/* 表格線 */</span>
+<span class="k">--color-rule-2</span>:  #D8D4C9;   <span class="c">/* 次級表格線、說明欄格線 */</span>
+<span class="k">--color-ink</span>:     #1F1C18;
+<span class="k">--color-ink-2</span>:   #4A453D;
+<span class="k">--color-ink-3</span>:   #6E685D;   <span class="c">/* 4.76:1 */</span>
+<span class="k">--color-stamp</span>:   #5B3FA8;   <span class="c">/* 6.64:1 完成章印油 */</span>
+<span class="k">--color-stamp-bg</span>:#EAE5F5;
+<span class="k">--color-alert</span>:   #B5321F;   <span class="c">/* 5.26:1 逾期 */</span>
+<span class="k">--color-alert-2</span>: #8F2718;   <span class="c">/* 7.32:1 刪除鈕 hover */</span>
+<span class="k">--color-alert-bg</span>:#F3DED9;
+
+<span class="k">--font-display</span>: "Barlow Semi Condensed", "Noto Sans TC";
+<span class="k">--font-sans</span>:    "Barlow", "Noto Sans TC";
+<span class="k">--font-mono</span>:    "Courier Prime", "Noto Sans TC";
+<span class="k">--radius-sm</span>:    2px;      <span class="c">/* 全站唯一圓角 */</span></pre>
+    </div>
+
+    <div class="swatches">
+      <div class="sw"><i style="background:#BFBCB1"></i><span>desk BFBCB1</span></div>
+      <div class="sw"><i style="background:#B2AEA2"></i><span>tray B2AEA2</span></div>
+      <div class="sw"><i style="background:#F0EEE7"></i><span>stock F0EEE7</span></div>
+      <div class="sw"><i style="background:#E7E4DA"></i><span>stub E7E4DA</span></div>
+      <div class="sw"><i style="background:#1F1C18"></i><span>ink 1F1C18</span></div>
+      <div class="sw"><i style="background:#5B3FA8"></i><span>stamp 5B3FA8</span></div>
+      <div class="sw"><i style="background:#B5321F"></i><span>alert B5321F</span></div>
+    </div>
+  </section>
+
+  <!-- 05 領域模型 -->
+  <section class="sec">
+    <div class="sec-head">
+      <span class="sec-no">05</span>
+      <h2>領域模型與端點</h2>
+      <p class="sec-note">契約已依這節寫成 <code>api/openapi.yaml</code>，之後以契約為準；這節維持成畫面對照表。01 節的原型已依 2026-09-08 的契約修訂重畫：<code>category</code> 下拉、<code>description</code> 欄位與 <code>category</code>-<code>sequence</code> 單號都已落地。</p>
+    </div>
+
+    <div class="tablebox">
+      <table>
+        <thead>
+          <tr><th>欄位</th><th>型別</th><th>不變條件</th><th>在畫面上的位置</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>id</code></td><td>string(uuid)</td><td>伺服器產生，唯讀，<b>永不改變</b>；給機器用，不是給人看的編號</td><td>不顯示；只用於路由與請求</td></tr>
+          <tr><td><code>sequence</code></td><td>integer</td><td>伺服器產生，唯讀，≥ 1；<b>每個 <code>category</code> 一個獨立計數器</b>，唯一的是（<code>category</code>, <code>sequence</code>）這一對</td><td>存根直排編號，與 <code>category</code> 合成 <code>bug-0007</code>；補零四位由前端做</td></tr>
+          <tr><td><code>title</code></td><td>string</td><td>必填，1–200 字，trim 後不得為空</td><td>單子主體（唯讀）；由右上角選單的「編輯」修改</td></tr>
+          <tr><td><code>description</code></td><td>string?</td><td>選填，上限 2000 字</td><td>新增／編輯彈窗的 <code>&lt;textarea&gt;</code>，有橫線的一塊區域；<b>工單明細的說明區（唯讀）</b>是看板上讀得到它的唯一位置；卡片正面不顯示（見下方註一、註五）</td></tr>
+          <tr><td><code>category</code></td><td>enum</td><td>必填，<code>feat</code> / <code>bug</code>；決定編號前綴，改它<b>會</b>從目標類別重新發號（見下方註三）</td><td>新增／編輯彈窗的下拉選單；存根頂端的類別記號（實心 <code>bug</code>／空心 <code>feat</code>）與單號前綴都讀這個欄位</td></tr>
+          <tr><td><code>completed</code></td><td>boolean</td><td>必填，預設 <code>false</code></td><td>決定單子在哪一架；方框點一下切換（見下方註二）</td></tr>
+          <tr><td><code>dueDate</code></td><td>date?</td><td>選填；早於今日且 <code>completed = false</code> → 逾期</td><td>單子頁腳；逾期轉紅並掛文字標籤</td></tr>
+          <tr><td><code>createdAt</code></td><td>date-time</td><td>伺服器產生，唯讀</td><td>架內預設排序；<b>工單明細頁腳</b>印「開單」，卡片上不顯示</td></tr>
+          <tr><td><code>updatedAt</code></td><td>date-time</td><td>伺服器產生，唯讀；每次 <code>PUT</code> 與 <code>PATCH</code> 都會動</td><td><b>工單明細頁腳</b>印「異動」，其餘畫面都不顯示</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="tablebox" style="margin-top:14px">
+      <table>
+        <thead>
+          <tr><th>操作</th><th>端點</th><th>畫面觸發方式</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>GET</code></td><td>/api/tasks?completed=</td><td>兩個架各發一次帶參數的查詢，篩選在伺服器端</td></tr>
+          <tr><td><code>GET</code></td><td>/api/tasks/{id}</td><td>點卡片（整張都可點）開啟唯讀的工單明細。窗先用架上那一列畫滿，這支查詢<b>只補 <code>description</code></b>；編輯彈窗開啟前也發一次，免得存檔時用空的說明蓋掉沒讀過的內容</td></tr>
+          <tr><td><code>POST</code></td><td>/api/tasks</td><td>看板右上「新增工單」（手機為右下浮動鈕）開啟彈窗，送出後進未完成架</td></tr>
+          <tr><td><code>PUT</code></td><td>/api/tasks/{id}</td><td>單子右上角選單 →「編輯」開啟同一張彈窗，帶入現值，送出即整筆更新</td></tr>
+          <tr><td><code>PATCH</code></td><td>/api/tasks/{id}/completion</td><td>點方框切換，或把單子拖到另一架；帶明確目標狀態（<code>true</code>／<code>false</code>）而非 toggle，反向操作不另開端點。樂觀更新，失敗回滾</td></tr>
+          <tr><td><code>DELETE</code></td><td>/api/tasks/{id}</td><td>同一個選單 →「刪除」跳確認彈窗，按下「確定」才送出；取消不打任何請求</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <p class="note"><b>註一 ·</b> <code>description</code> <b>已進 UI</b>：新增／編輯共用的那張彈窗多一個 <code>&lt;textarea&gt;</code>，開單與改單自動一起有。它畫成有橫線的一塊區域而不是一條線 —— 版型本身就在說這格可以寫長一點，不必再寫一句「可多行輸入」。<b>卡片正面仍然不放它</b>：多一段說明文字會把看板變成閱讀介面，而看板要能一眼掃完。上限 2000 字只做驗證不做顯示，跟 <code>title</code> 同一條規則。<b>看板現在有讀內文的入口了</b>（2026-09-09 裁示，<b>推翻前一版</b>）：點卡片開一張唯讀的工單明細。前一版寫的是「不做」，理由是多一層展開會把看板推向閱讀介面 —— 那個顧慮由兩件事解掉：<b>卡片正面仍然一個字都不放</b>，看板照樣一眼掃完；而明細是<b>另一張紙</b>不是卡片上的展開，看板的版型一格都沒動。真正推翻它的是契約 —— <code>GET /api/tasks/{id}</code> 本來就在，卻只有編輯彈窗用得到：要讀一段說明得先按「編輯」，等於逼人打開一個會改資料的表單去做唯讀的事。</p>
+
+    <p class="note"><b>註二 ·</b> 狀態就是題目寫的那一個布林值，沒有多出 enum。看板的兩個架是 <code>completed</code> 的視覺投影，點方框等同 <code>PATCH { "completed": … }</code>，拖到另一架也是同一支端點。之後若真要有「進行中」，那是一次模型變更（boolean → enum）而不是前端多塞一個欄位，這版刻意不先做。</p>
+    <p class="note"><b>註三 ·</b> 工單編號<b>不是</b> <code>id</code>，而是 <code>category</code> + <code>sequence</code> 算出來的顯示字串：<code>`${category}-${String(sequence).padStart(4, "0")}`</code>。契約走原始整數，補零到四位是前端的顯示責任。<code>bug</code> 與 <code>feat</code> <b>各有一個計數器</b>，所以 <code>bug-0001</code> 與 <code>feat-0001</code> 會同時存在。也因為兩個計數器獨立，<b>改類別時會從目標類別重新發號</b>（<code>feat-0003</code> → 例如 <code>bug-0007</code>），舊號作廢不回收；沿用舊號會跟既有的 <code>bug-0003</code> 撞號，而顯示編號撞號等於這個編號不能拿來指認單子。換號之所以無痛，是因為 <code>id</code> 是獨立的 uuid：網址與正在飛的請求都認 <code>id</code>，不受影響。代價是使用者手上記的號碼在搬類別後會變。分組、篩選、上色一律讀 <code>category</code>，不要去解析前綴。</p>
+
+    <p class="note"><b>註五 ·</b> <b>工單明細（第二聯）唯讀，底下只有「關閉」。</b>全站兩張彈窗一律取消／確定，這一張不同是因為它沒有東西要「確定」—— 一張讀完就收起來的紙，唯一誠實的按鈕是關閉。<b>編輯與刪除不放進來</b>：那兩個動作在三點選單裡，一個 Esc 的距離，放進明細等於同一組動作有兩個入口，還會讓 modal 疊 modal（明細開編輯窗，關閉順序就開始難講）。<b>狀態格也是唯讀</b>，改狀態是卡片方框的事。<b>開窗順序：先畫再補。</b>卡片手上那一列（<code>TaskSummary</code>）已經有 <code>description</code> 以外的全部欄位，所以窗一開就畫滿，只有說明區等查詢 —— 不是整窗骨架，版面不會在資料到齊時跳一下。連點兩張卡時，先發的回應要用一個號碼比對擋掉，不能寫進後開的那張窗；關窗也一併作廢飛在路上的查詢。<b>錯誤留在窗裡</b>，不走看板那條載入失敗橫幅 —— 橫幅在 modal 後面，人看不到。</p>
+
+    <p class="note"><b>註四 ·</b> <code>dueDate</code> 是<b>日期</b>不是時間戳：單子是「某天」到期而不是「某個瞬間」到期，帶時區的時間戳會讓同一張單在不同時區看起來一個逾期一個沒有。契約裡也沒有 <code>overdue</code> 旗標 —— 逾期就是 <code>dueDate &lt; 今天 &amp;&amp; !completed</code>，前端自己算。伺服器算好的旗標在瀏覽器裡跨過午夜就過期了，而前端本來就要重算。</p>
+
+  </section>
+
+  <div class="rowmenu" popover data-rowmenu aria-label="單子操作">
+    <div class="rowmenu-no" data-rowmenu-no>bug-0000</div>
+    <button type="button" class="m-edit" autofocus><span class="g" aria-hidden="true">✎</span>編輯</button>
+    <button type="button" class="m-del"><span class="g" aria-hidden="true">×</span>刪除</button>
+  </div>
+
+  <button type="button" class="fab" data-open aria-label="新增工單">＋</button>
+
+  <div class="colophon">
+    <span>任務管理應用程式</span>
+    <span>REV. D — 修訂 13：明細三格欄位改 flex 換行，修掉窄容器下多出來的空格；窄螢幕標籤與值同列</span>
+    <span>NOTO SANS TC / BARLOW SEMI CONDENSED / BARLOW / COURIER PRIME</span>
+    <span>2026-09-09</span>
+  </div>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  var TODAY = "2026-09-06";
+
+  /* 兩段狀態。架別只是 completed 這個布林值的投影，沒有第三種狀態。 */
+  var ORDER   = ["open", "done"];
+  var LABELS  = { open: "未完成", done: "已完成" };
+  var EMPTIES = {
+    open: "架上沒有單子 —— 按「新增工單」開一張",
+    done: "還沒有蓋章的單子"
+  };
+
+  /* id 是機器用的（這裡用流水號代打 uuid），人看的單號是 category + sequence
+     這一對。兩個類別各自計數，所以 bug 與 feat 的號碼會各走各的。
+     sequence 有跳號是正常的 —— 發下去的號不回收，改類別時舊號直接作廢。 */
+  var docketsData = [
+    { id: 12, category: "bug",  sequence: 12, title: "補上 CORS 設定，讓 5173 打得到 8080",
+      description: "Vite dev server 在 5173、後端在 8080，預檢請求被擋掉。\n\n重現：啟動兩邊之後在瀏覽器 console 看 CORS 錯誤。\n修好的定義：/api/tasks 的 GET 與 POST 都不再被預檢擋下，正式環境的來源另外設。",
+      completed: false, dueDate: "2026-09-07",
+      createdAt: "2026-09-05T09:12:00Z", updatedAt: "2026-09-05T09:12:00Z" },
+    { id: 4,  category: "feat", sequence: 4,  title: "README 補上領域模型與規格存取方式",
+      description: null, completed: false, dueDate: "2026-09-04",
+      createdAt: "2026-09-02T14:30:00Z", updatedAt: "2026-09-03T08:05:00Z" },
+    { id: 16, category: "feat", sequence: 6,  title: "撰寫 openapi.yaml 契約：Task schema 與五個端點",
+      description: "契約是整包 monorepo 的單一事實來源，兩邊的傳輸型別都從它產生，不手寫。",
+      completed: false, dueDate: "2026-09-07",
+      createdAt: "2026-09-04T10:41:00Z", updatedAt: "2026-09-04T10:41:00Z" },
+    { id: 9,  category: "feat", sequence: 7,  title: "以 openapi-generator 產生 Spring 介面並實作 delegate",
+      description: null, completed: false, dueDate: "2026-09-08",
+      createdAt: "2026-09-04T11:02:00Z", updatedAt: "2026-09-05T16:20:00Z" },
+    { id: 14, category: "feat", sequence: 8,  title: "產生 TypeScript client，接上 Pinia store",
+      description: null, completed: false, dueDate: "2026-09-09",
+      createdAt: "2026-09-05T09:55:00Z", updatedAt: "2026-09-05T09:55:00Z" },
+    { id: 7,  category: "bug",  sequence: 9,  title: "補齊 // [AI assisted NNN] 註解與 chat-records/",
+      description: "001 與 002 那兩次改動產生的程式碼還沒回頭補標註。",
+      completed: false, dueDate: null,
+      createdAt: "2026-09-05T18:07:00Z", updatedAt: "2026-09-06T08:31:00Z" },
+    { id: 2,  category: "feat", sequence: 2,  title: "專案骨架：Maven wrapper + Vite 初始化",
+      description: null, completed: true, dueDate: "2026-09-01",
+      createdAt: "2026-08-30T13:20:00Z", updatedAt: "2026-09-01T17:44:00Z" },
+    { id: 5,  category: "feat", sequence: 3,  title: "TaskController 整合測試（MockMvc）",
+      description: null, completed: true, dueDate: "2026-09-03",
+      createdAt: "2026-09-01T09:15:00Z", updatedAt: "2026-09-03T15:02:00Z" },
+    { id: 6,  category: "feat", sequence: 5,  title: "Tailwind 4 @theme 與設計 token",
+      description: null, completed: true, dueDate: null,
+      createdAt: "2026-09-03T11:28:00Z", updatedAt: "2026-09-05T10:09:00Z" }
+  ];
+
+  /* 原型裡「現在」是固定的，跟 TODAY 同一天，免得每次重整都跑掉 */
+  var NOW = TODAY + "T09:41:00Z";
+
+  /* 類別的中文說法。前綴由 numOf 算，這裡只補那句人話。 */
+  var CAT_NAMES = { bug: "修復", feat: "新功能" };
+
+  var nextId = 20;
+
+  /* 每個類別一個計數器。初值從現有資料推回來，之後只加不減。 */
+  var counters = { bug: 0, feat: 0 };
+  docketsData.forEach(function (d) {
+    if (d.sequence > counters[d.category]) { counters[d.category] = d.sequence; }
+  });
+
+  var stacks = {};
+  var tallies = {};
+  ORDER.forEach(function (key) {
+    stacks[key] = document.querySelector('[data-stack="' + key + '"]');
+    tallies[key] = document.querySelector('[data-tally="' + key + '"]');
+  });
+
+  function pad(n) { return ("0000" + n).slice(-4); }
+
+  /* [AI assisted 004] 使用 AI 協助把 003 定案的編號規則落到原型上：原本整份規格
+     寫死 WO-0012，加了 category 下拉之後若不一起改，選了 bug 卻仍印 WO-0020，
+     原型會自相矛盾。
+     人看的單號不是 id，是（category, sequence）算出來的顯示字串。
+     補零到四位是畫面的責任，契約走原始整數。 */
+  function numOf(d) { return d.category + "-" + pad(d.sequence); }
+
+  function fmtDue(iso) { return iso ? iso.slice(5).replace("-", "/") : "無期限"; }
+
+  /* 明細印完整年份 —— 卡片省年份是因為「近期工作的年份是雜訊」，
+     一張攤開來讀的單子不成立。 */
+  function fmtDueFull(iso) { return iso || "無期限"; }
+
+  /* 時間戳直接切字串，不過 new Date() —— 過了 Date 就會被瀏覽器時區推，
+     同一筆資料在不同時區看到不同的開單日。理由跟 dueDate 用 date 不用
+     date-time 是同一條。 */
+  function fmtStamp(iso) { return iso ? iso.slice(0, 10) + " " + iso.slice(11, 16) : "—"; }
+
+  /* 類別記號：實心 bug／空心 feat。卡片與明細窗畫的是同一個東西，做成一份。 */
+  function makeCat(category) {
+    var cat = document.createElement("span");
+    cat.className = "cat";
+    cat.dataset.cat = category;
+    cat.setAttribute("aria-hidden", "true");
+    var mark = document.createElement("span");
+    mark.textContent = category.charAt(0).toUpperCase();
+    cat.appendChild(mark);
+    return cat;
+  }
+
+  function rack(d) { return d.completed ? "done" : "open"; }
+
+  function isLate(d) { return !!d.dueDate && d.dueDate < TODAY && !d.completed; }
+
+  function build(d) {
+    var el = document.createElement("article");
+    el.className = "docket"
+      + (d.completed ? " done" : "")
+      + (isLate(d) ? " overdue" : "");
+    el.draggable = true;
+    el.dataset.id = String(d.id);
+
+    var stub = document.createElement("div");
+    stub.className = "stub";
+
+    /* 類別記號：實心 bug／空心 feat。編號本身就印著類別，這個記號對讀屏是
+       冗餘的，所以整塊 aria-hidden，只服務用看的人。 */
+    var cat = makeCat(d.category);
+
+    var code = document.createElement("code");
+    code.textContent = numOf(d);
+    stub.appendChild(cat);
+    stub.appendChild(code);
+
+    var body = document.createElement("div");
+    body.className = "body";
+
+    /* [AI assisted 007] 標題是一顆按鈕，用 ::after 把感應區撐滿整張卡：滑鼠拿到
+       整張卡，無障礙樹只多一顆按鈕，方框與三點鈕是它的兄弟節點不受影響。
+       aria-label 把單號墊在前面，可見文字整段包含在內（WCAG 2.5.3）。
+       拖曳與點擊不必自己分辨 —— 原生 DnD 完成一次拖曳後不會再派 click。 */
+    var title = document.createElement("p");
+    title.className = "title";
+    var open = document.createElement("button");
+    open.type = "button";
+    open.className = "open";
+    open.textContent = d.title;
+    open.setAttribute("aria-label", numOf(d) + " " + d.title + "，檢視明細");
+    title.appendChild(open);
+
+    var foot = document.createElement("div");
+    foot.className = "foot";
+
+    var mark = document.createElement("button");
+    mark.type = "button";
+    mark.className = "mark";
+    mark.setAttribute("aria-pressed", d.completed ? "true" : "false");
+    mark.setAttribute("aria-label",
+      "狀態：" + LABELS[rack(d)] + "，按下標記為" + LABELS[d.completed ? "open" : "done"]);
+    mark.innerHTML = '<span class="tick" aria-hidden="true">✓</span>';
+    mark.appendChild(document.createTextNode(LABELS[rack(d)]));
+
+    var due = document.createElement("span");
+    due.className = "due" + (isLate(d) ? " late" : "");
+    due.textContent = fmtDue(d.dueDate);
+
+    var menubtn = document.createElement("button");
+    menubtn.type = "button";
+    menubtn.className = "menubtn";
+    menubtn.innerHTML = "<i></i><i></i><i></i>";
+    menubtn.setAttribute("aria-label", numOf(d) + " 的操作選單");
+    menubtn.setAttribute("aria-haspopup", "true");
+
+    foot.appendChild(mark);
+    foot.appendChild(due);
+    body.appendChild(title);
+    body.appendChild(foot);
+    el.appendChild(stub);
+    el.appendChild(body);
+    el.appendChild(menubtn);
+
+    if (d.completed) {
+      var chop = document.createElement("span");
+      chop.className = "chop";
+      chop.textContent = "完成 DONE";
+      el.appendChild(chop);
+    }
+    return el;
+  }
+
+  function render() {
+    ORDER.forEach(function (key) {
+      var rows = docketsData.filter(function (d) { return rack(d) === key; });
+      stacks[key].textContent = "";
+      if (!rows.length) {
+        var e = document.createElement("div");
+        e.className = "empty";
+        e.textContent = EMPTIES[key];
+        stacks[key].appendChild(e);
+      } else {
+        rows.forEach(function (d) { stacks[key].appendChild(build(d)); });
+      }
+      tallies[key].textContent = String(rows.length);
+    });
+  }
+
+  function find(id) {
+    for (var i = 0; i < docketsData.length; i++) {
+      if (docketsData[i].id === Number(id)) { return docketsData[i]; }
+    }
+    return null;
+  }
+
+  /* --- 刪除：不可逆，所以先問一次；預設焦點放在「取消」 --- */
+  var confirmBox = document.querySelector("[data-confirm]");
+  var confirmNo = document.querySelector("[data-cno]");
+  var confirmTitle = document.querySelector("[data-ctitle]");
+  var confirmCancel = document.querySelector("[data-ccancel]");
+  var confirmingId = null;
+
+  function askDelete(d) {
+    if (!d) { return; }
+    confirmingId = d.id;
+    confirmNo.textContent = numOf(d);
+    confirmTitle.textContent = d.title;
+    confirmBox.showModal();
+    /* showModal 預設會把焦點丟給第一個可聚焦元素，這裡剛好就是「取消」；
+       還是寫明白，免得日後在它前面插了別的東西就變成焦點落在刪除上。 */
+    confirmCancel.focus();
+  }
+
+  function removeDocket(id) {
+    for (var i = 0; i < docketsData.length; i++) {
+      if (docketsData[i].id === Number(id)) {
+        docketsData.splice(i, 1);
+        render();
+        return;
+      }
+    }
+  }
+
+  confirmCancel.addEventListener("click", function () { confirmBox.close(); });
+  document.querySelector("[data-cok]").addEventListener("click", function () {
+    var id = confirmingId;
+    confirmBox.close();
+    removeDocket(id);
+  });
+  /* Esc 關閉也走這裡，等同取消 */
+  confirmBox.addEventListener("close", function () { confirmingId = null; });
+
+  /* --- 工單明細（第二聯）：唯讀，只有「關閉」 ---
+     [AI assisted 007] 這一段的順序是與 AI 討論後定的：窗先用架上那一列開起來
+     （單號、標題、狀態、到期日、類別、時間戳都在手上），只有說明區等查詢。
+     契約裡 Task 就是 TaskSummary 加一個 description，沒有理由讓整張窗一起等。 */
+  var copy = document.querySelector("[data-copy]");
+  var copyCatEl = document.querySelector("[data-copycat]");
+  var copyNo = document.querySelector("[data-copyno]");
+  var copyChop = document.querySelector("[data-copychop]");
+  var copyTitle = document.querySelector("[data-copytitle]");
+  var copyState = document.querySelector("[data-copystate]");
+  var copyDue = document.querySelector("[data-copydue]");
+  var copyCatName = document.querySelector("[data-copycatname]");
+  var copyDesc = document.querySelector("[data-copydesc]");
+  var copyStatus = document.querySelector("[data-copystatus]");
+  var copyCreated = document.querySelector("[data-copycreated]");
+  var copyUpdated = document.querySelector("[data-copyupdated]");
+
+  /* 原型用這段延遲演示「說明還在路上」；真的實作是 GET /api/tasks/{id}。 */
+  var COPY_DELAY = 460;
+  /* 這一張的第一次查詢固定失敗，好讓失敗狀態在頁面上按得出來，不必只用文字描述。
+     按「重試」就會成功。 */
+  var FLAKY_ID = 7;
+  var flakyUsed = false;
+  /* 連點兩張卡時，先發的回應不能蓋掉後開的那張：每次查詢領一個號碼，回來時比對。
+     關窗時也把號碼推掉，飛在路上的那次就寫不進已經關上的窗。 */
+  var copyToken = 0;
+
+  function showDesc(d) {
+    var p = document.createElement("p");
+    /* 沒填說明就走 placeholder 的視覺規則（斜體、小一號、淡一階），
+       跟真的內容一眼分得開。 */
+    p.className = "desc-text" + (d.description ? "" : " none");
+    p.textContent = d.description || "這張單子沒有寫說明";
+    copyDesc.textContent = "";
+    copyDesc.appendChild(p);
+  }
+
+  function showDescFail(d) {
+    var box = document.createElement("div");
+    box.className = "fail";
+    /* role="alert" 插進來就會唸，不需要常駐 —— 跟上面那條狀態列相反 */
+    box.setAttribute("role", "alert");
+    var head = document.createElement("strong");
+    head.textContent = "第二聯調不出來";
+    var why = document.createElement("span");
+    why.textContent = "伺服器回 500。單子其餘欄位是架上那一份，只有說明沒到。";
+    var again = document.createElement("button");
+    again.type = "button";
+    again.textContent = "重試";
+    again.addEventListener("click", function () { loadDesc(d); });
+    box.appendChild(head);
+    box.appendChild(why);
+    box.appendChild(again);
+    copyDesc.textContent = "";
+    copyDesc.appendChild(box);
+  }
+
+  function loadDesc(d) {
+    var token = ++copyToken;
+    copyDesc.setAttribute("aria-busy", "true");
+    copyStatus.textContent = "正在取回第二聯…";
+    copyDesc.textContent = "";
+    ["w70", "w45", "w60"].forEach(function (w) {
+      var bar = document.createElement("div");
+      bar.className = "skel " + w;
+      copyDesc.appendChild(bar);
+    });
+
+    window.setTimeout(function () {
+      if (token !== copyToken) { return; }
+      copyDesc.setAttribute("aria-busy", "false");
+      copyStatus.textContent = "";
+      if (d.id === FLAKY_ID && !flakyUsed) { flakyUsed = true; showDescFail(d); return; }
+      showDesc(d);
+    }, COPY_DELAY);
+  }
+
+  function openCopy(d) {
+    if (!d) { return; }
+
+    copy.classList.toggle("done", d.completed);
+    copyCatEl.dataset.cat = d.category;
+    copyCatEl.firstElementChild.textContent = d.category.charAt(0).toUpperCase();
+    copyNo.textContent = numOf(d);
+    copyChop.hidden = !d.completed;
+    copyTitle.textContent = d.title;
+
+    /* 狀態借卡片那顆方框的樣子，但這裡按不下去 —— 改狀態是卡片的事 */
+    var mk = document.createElement("span");
+    mk.className = "mark";
+    mk.innerHTML = '<span class="tick" aria-hidden="true">✓</span>';
+    mk.appendChild(document.createTextNode(LABELS[rack(d)]));
+    copyState.textContent = "";
+    copyState.appendChild(mk);
+
+    var due = document.createElement("span");
+    due.className = "due" + (isLate(d) ? " late" : "");
+    due.textContent = fmtDueFull(d.dueDate);
+    copyDue.textContent = "";
+    copyDue.appendChild(due);
+
+    copyCatName.textContent = "";
+    copyCatName.appendChild(makeCat(d.category));
+    copyCatName.appendChild(
+      document.createTextNode(d.category + " — " + CAT_NAMES[d.category]));
+
+    copyCreated.textContent = fmtStamp(d.createdAt);
+    copyUpdated.textContent = fmtStamp(d.updatedAt);
+
+    loadDesc(d);
+    copy.showModal();
+    /* 焦點落在窗本身而不是「關閉」：這是一張用來讀的紙，不是一個要下決定的問句，
+       把焦點丟到「關閉」等於一開場就先把人帶到出口。 */
+    copy.focus();
+  }
+
+  document.querySelector("[data-copyclose]").addEventListener("click", function () { copy.close(); });
+  /* Esc 也走這裡 */
+  copy.addEventListener("close", function () { copyToken++; });
+
+  document.addEventListener("click", function (ev) {
+    var menubtn = ev.target.closest(".menubtn");
+    if (menubtn && menubtn.closest("[data-stack]")) {
+      openRowMenu(menubtn, find(menubtn.closest(".docket").dataset.id));
+      return;
+    }
+    var mark = ev.target.closest(".mark");
+    if (mark && mark.closest("[data-stack]")) {
+      var d = find(mark.closest(".docket").dataset.id);
+      d.completed = !d.completed;
+      d.updatedAt = NOW;
+      render();
+      return;
+    }
+    /* 卡片上其餘的地方都算「開明細」—— 感應區是標題按鈕的 ::after 撐出來的 */
+    var open = ev.target.closest(".open");
+    if (open && open.closest("[data-stack]")) {
+      openCopy(find(open.closest(".docket").dataset.id));
+    }
+  });
+
+  /* --- 拖曳換架 --- */
+  var draggingId = null;
+
+  document.addEventListener("dragstart", function (ev) {
+    var card = ev.target.closest && ev.target.closest(".docket");
+    if (!card || !card.closest("[data-stack]")) { return; }
+    draggingId = card.dataset.id;
+    card.classList.add("dragging");
+    ev.dataTransfer.effectAllowed = "move";
+    ev.dataTransfer.setData("text/plain", draggingId);
+  });
+
+  document.addEventListener("dragend", function () {
+    draggingId = null;
+    Array.prototype.forEach.call(document.querySelectorAll(".dragging"), function (n) { n.classList.remove("dragging"); });
+    Array.prototype.forEach.call(document.querySelectorAll(".tray.over"), function (n) { n.classList.remove("over"); });
+  });
+
+  Array.prototype.forEach.call(document.querySelectorAll("[data-tray]"), function (tray) {
+    tray.addEventListener("dragover", function (ev) {
+      if (draggingId === null) { return; }
+      ev.preventDefault();
+      ev.dataTransfer.dropEffect = "move";
+      tray.classList.add("over");
+    });
+    tray.addEventListener("dragleave", function (ev) {
+      if (!tray.contains(ev.relatedTarget)) { tray.classList.remove("over"); }
+    });
+    tray.addEventListener("drop", function (ev) {
+      ev.preventDefault();
+      tray.classList.remove("over");
+      var id = ev.dataTransfer.getData("text/plain") || draggingId;
+      var d = find(id);
+      if (d) { d.completed = (tray.dataset.tray === "done"); d.updatedAt = NOW; render(); }
+    });
+  });
+
+  /* --- 單子選單：原生 popover，一個面板服務所有卡片 --- */
+  var rowmenu = document.querySelector("[data-rowmenu]");
+  var rowmenuNo = document.querySelector("[data-rowmenu-no]");
+  var menuId = null;
+  /* popover 的 light dismiss 在 click 之前就把面板關掉了，而 toggle 事件是非同步派送的，
+     來不及在同一次 click 裡查。所以在 pointerdown 當下同步記一筆：按下去的那一刻，
+     面板是為哪一張單子開著的。再點同一顆三點鈕時就當作關閉，讓它表現得像個開關。 */
+  var wasOpenFor = null;
+
+  document.addEventListener("pointerdown", function () {
+    wasOpenFor = rowmenu.matches(":popover-open") ? menuId : null;
+  }, true);
+
+  function openRowMenu(btn, d) {
+    if (!d) { return; }
+    if (wasOpenFor === d.id) {
+      wasOpenFor = null;
+      if (rowmenu.matches(":popover-open")) { rowmenu.hidePopover(); }
+      return;
+    }
+    menuId = d.id;
+    rowmenuNo.textContent = numOf(d);
+    rowmenu.showPopover();
+
+    var r = btn.getBoundingClientRect();
+    var m = rowmenu.getBoundingClientRect();
+    var top = r.bottom + 4;
+    if (top + m.height > window.innerHeight - 8) { top = r.top - m.height - 4; }
+    rowmenu.style.top = Math.max(8, top) + "px";
+    rowmenu.style.left =
+      Math.max(8, Math.min(r.right - m.width, window.innerWidth - m.width - 8)) + "px";
+    openScrollY = window.scrollY;
+  }
+
+  rowmenu.addEventListener("click", function (ev) {
+    var btn = ev.target.closest("button");
+    if (!btn || menuId === null) { return; }
+    var id = menuId;
+    rowmenu.hidePopover();
+    if (btn.classList.contains("m-edit")) { openSheet(find(id)); }
+    else if (btn.classList.contains("m-del")) { askDelete(find(id)); }
+  });
+
+  /* 面板是 fixed 的，捲動或改變視窗大小就關掉，免得它跟卡片脫節。
+     比對捲動位置而不是「有沒有收到 scroll 事件」—— 開啟當下若剛好有一個排隊中的
+     scroll 事件（例如程式先 scrollTo 再開選單），會把才剛開的面板誤關。 */
+  var openScrollY = 0;
+  window.addEventListener("scroll", function () {
+    if (!rowmenu.matches(":popover-open")) { return; }
+    if (Math.abs(window.scrollY - openScrollY) < 2) { return; }
+    rowmenu.hidePopover();
+  });
+  window.addEventListener("resize", function () {
+    if (rowmenu.matches(":popover-open")) { rowmenu.hidePopover(); }
+  });
+
+  /* --- 同一張彈窗兩種模式：沒帶單子是開單（POST），帶了就是改單（PUT） --- */
+  var sheet = document.querySelector("[data-sheet]");
+  var sheetForm = document.querySelector("[data-sheetform]");
+  var sheetNo = document.querySelector("[data-sheetno]");
+  var sheetHeading = document.querySelector("[data-sheetheading]");
+  var fTitle = document.getElementById("f-title");
+  var fCat = document.getElementById("f-cat");
+  var fDesc = document.getElementById("f-desc");
+  var fDue = document.getElementById("f-due");
+  var catHint = document.querySelector("[data-cathint]");
+  var titleField = document.querySelector('[data-field="title"]');
+  var titleMsg = document.getElementById("f-title-msg");
+  var editingId = null;
+  var editingCat = null;
+
+  /* [AI assisted 004] 由 AI 提議把空標題的驗證接起來，而不是只留一個空洞 ——
+     預留訊息位的目的就是承接驗證訊息，讓規格頁直接演示「訊息出現時版面不跳」，
+     而不是用文字描述這件事。
+     提示列平常空著。這裡是唯一會往裡面寫字的地方 —— 位置早就佔好了，
+     訊息出現與消失都不會推動下面的欄位。 */
+  function setTitleError(msg) {
+    titleMsg.textContent = msg || "";
+    titleMsg.classList.toggle("err", !!msg);
+    titleField.classList.toggle("bad", !!msg);
+  }
+
+  /* 一開始打字就把錯誤收掉：使用者已經在處理了，不需要紅字一路瞪著他。 */
+  fTitle.addEventListener("input", function () { setTitleError(""); });
+
+  /* 改類別會換號，這件事得在按下確定之前講，不能等單子換了號才發現。
+     只有真的改動時才寫字，否則這行會變成永遠亮著的紅字。 */
+  function syncCatHint() {
+    if (editingCat === null || fCat.value === editingCat) {
+      catHint.textContent = "";
+      catHint.classList.remove("warn");
+      return;
+    }
+    catHint.textContent = "重新發號：" + editingCat + "-" + pad(find(editingId).sequence) +
+      " → " + fCat.value + "-" + pad(counters[fCat.value] + 1);
+    catHint.classList.add("warn");
+  }
+
+  fCat.addEventListener("change", syncCatHint);
+
+  function openSheet(d) {
+    sheetForm.reset();
+    editingId = d ? d.id : null;
+    editingCat = d ? d.category : null;
+    if (d) {
+      sheetNo.textContent = numOf(d);
+      sheetHeading.textContent = "編輯工單";
+      fTitle.value = d.title;
+      fCat.value = d.category;
+      fDesc.value = d.description || "";
+      fDue.value = d.dueDate || "";
+    } else {
+      sheetNo.textContent = "NEW";
+      sheetHeading.textContent = "新增工單";
+      fCat.value = "bug";
+    }
+    setTitleError("");
+    syncCatHint();
+    sheet.showModal();
+    fTitle.focus();
+    fTitle.select();
+  }
+
+  Array.prototype.forEach.call(document.querySelectorAll("[data-open]"), function (btn) {
+    btn.addEventListener("click", function () { openSheet(null); });
+  });
+
+  document.querySelector("[data-cancel]").addEventListener("click", function () { sheet.close(); });
+
+  sheetForm.addEventListener("submit", function (ev) {
+    ev.preventDefault();
+    var v = fTitle.value.trim();
+    if (!v) { setTitleError("標題不能空白。"); fTitle.focus(); return; }
+    setTitleError("");
+    var cat = fCat.value;
+    var desc = fDesc.value.trim();
+    if (editingId === null) {
+      docketsData.push({
+        id: nextId++,
+        category: cat,
+        sequence: ++counters[cat],
+        title: v,
+        description: desc || null,
+        completed: false,
+        dueDate: fDue.value || null,
+        createdAt: NOW,
+        updatedAt: NOW
+      });
+    } else {
+      var d = find(editingId);
+      if (d) {
+        /* 改類別＝從目標類別的計數器重新發號，舊號作廢不回收。沿用舊號會跟
+           目標類別既有的同號單子撞號，而撞號的編號就不能拿來指認單子了。
+           id 沒變，所以網址與飛在路上的請求都不受影響。 */
+        if (d.category !== cat) { d.category = cat; d.sequence = ++counters[cat]; }
+        d.title = v;
+        d.description = desc || null;
+        d.dueDate = fDue.value || null;
+        d.updatedAt = NOW;
+      }
+    }
+    sheet.close();
+    render();
+  });
+
+  render();
+})();
+</script>
+
+</body>
+</html>
