@@ -55,6 +55,9 @@ const emit = defineEmits<MainLayoutEmits>()
       </section>
     </main>
 
+    <!-- [AI assisted 009] 兩顆按鈕，而不是一顆用 CSS 搬位置：同一顆要同時當標題列的
+         34px 墨條與角落的 56px 圓鈕，等於整組樣式在斷點兩邊各寫一次。拆成兩顆之後各自
+         只有一種長相，代價是 DOM 裡有兩顆同名按鈕 —— 任一寬度只有一顆 display 得出來。 -->
     <!--
       The same action again, in the corner a thumb reaches. Only ever one of the two
       is displayed, so the frame never offers 新增工單 twice — this one below 700px,
