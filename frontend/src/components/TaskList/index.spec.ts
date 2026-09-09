@@ -179,5 +179,13 @@ describe('TaskList', () => {
 
       expect(wrapper.emitted('delete')).toEqual([[cors]])
     })
+
+    it('passes a request to read a docket up with the task it belongs to', async () => {
+      const wrapper = mountList(three)
+
+      await cardAt(wrapper, 1).vm.$emit('detail')
+
+      expect(wrapper.emitted('detail')).toEqual([[readme]])
+    })
   })
 })

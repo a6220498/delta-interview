@@ -2,6 +2,8 @@
 import { storeToRefs } from 'pinia'
 import { onMounted, useTemplateRef } from 'vue'
 
+import CardDetailDialog from '@/components/CardDetailDialog/index.vue'
+import type { CardDetailDialogExposed } from '@/components/CardDetailDialog/types'
 import DeleteDialog from '@/components/DeleteDialog/index.vue'
 import type { DeleteDialogExposed } from '@/components/DeleteDialog/types'
 import Header from '@/components/Header/index.vue'
@@ -49,6 +51,23 @@ function reload(): void {
  */
 function tasksFor(rack: TaskRack): TaskSummary[] {
   return taskList.value.filter((task) => task.completed === rack.completed)
+}
+
+// [AI assisted 008] 明細跟 openEdit 相反，不先 fetch 再開窗：卡片手上那一列已經畫得出
+// 六個欄位，只有說明要等，整窗一起等會讓五個已知欄位無謂地空著。
+/**
+ * The read-only copy, held the same way as the two sheets below. The row goes straight
+ * over unfetched: it draws the whole window but 說明, which the window fetches itself.
+ */
+const cardDetailDialogEl = useTemplateRef<CardDetailDialogExposed>('cardDetailDialogEl')
+
+/**
+ * Pulls a docket off the shelf to be read.
+ *
+ * @param task - The row whose card was pressed.
+ */
+function openDetail(task: TaskSummary): void {
+  cardDetailDialogEl.value?.open(task)
 }
 
 /**
@@ -125,11 +144,18 @@ function openDelete(task: TaskSummary): void {
         :rack="rack"
         :tasks="tasksFor(rack)"
         :loading="loading"
+        @detail="openDetail"
         @edit="openEdit"
         @delete="openDelete"
       />
     </div>
   </MainLayout>
+
+  <!--
+    The read-only copy, mounted beside the two sheets for the same two reasons. It
+    fetches the one field the shelf never held and keeps any failure inside itself.
+  -->
+  <CardDetailDialog ref="cardDetailDialogEl" />
 
   <!--
     One sheet for both jobs, opened by name and left mounted while closed so the

@@ -72,6 +72,7 @@ const emit = defineEmits<TaskListEmits>()
       >
         <Card
           :task="task"
+          @detail="emit('detail', task)"
           @edit="emit('edit', task)"
           @delete="emit('delete', task)"
         />

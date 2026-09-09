@@ -168,7 +168,22 @@ function onMenuClose(byButton: boolean): void {
           task.completed ? 'text-ink-2 line-through decoration-stamp decoration-[1.5px]' : 'text-ink'
         "
       >
-        {{ task.title }}
+        <!-- [AI assisted 008] 選 stretched link 而不是在 <article> 掛 click：後者會把
+             方框與三點鈕變成巢狀互動元素，兩顆都得靠 stopPropagation 補救。 -->
+        <!--
+          The title is the button; its ::after overlay makes the whole card the target,
+          so the mark and menu stay siblings. A line-through cannot cross into it.
+        -->
+        <button
+          type="button"
+          data-open-detail
+          :aria-label="`${number} ${task.title}，檢視明細`"
+          class="cursor-pointer border-0 bg-transparent p-0 text-left [overflow-wrap:anywhere] after:absolute after:inset-0 after:rounded-sm after:content-[''] hover:underline hover:decoration-1 hover:underline-offset-[3px] focus-visible:outline-none focus-visible:after:-outline-offset-2 focus-visible:after:outline-2 focus-visible:after:outline-stamp"
+          :class="task.completed ? 'line-through decoration-stamp decoration-[1.5px]' : undefined"
+          @click="emit('detail')"
+        >
+          {{ task.title }}
+        </button>
       </p>
 
       <div class="flex flex-wrap items-center gap-2">
@@ -180,7 +195,7 @@ function onMenuClose(byButton: boolean): void {
           type="button"
           :aria-pressed="task.completed"
           :aria-label="markLabel"
-          class="relative inline-flex min-h-6 cursor-pointer appearance-none items-center gap-1.5 rounded-sm border bg-transparent py-[3px] pr-[7px] pl-[5px] font-mono text-[10.5px] tracking-[0.06em] before:absolute before:-inset-x-[2px] before:-inset-y-[11px] before:content-[''] focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-stamp"
+          class="relative z-[1] inline-flex min-h-6 cursor-pointer appearance-none items-center gap-1.5 rounded-sm border bg-transparent py-[3px] pr-[7px] pl-[5px] font-mono text-[10.5px] tracking-[0.06em] before:absolute before:-inset-x-[2px] before:-inset-y-[11px] before:content-[''] focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-stamp"
           :class="
             task.completed
               ? 'border-stamp text-stamp'
@@ -243,7 +258,7 @@ function onMenuClose(byButton: boolean): void {
       type="button"
       :aria-label="`${number} 的操作選單`"
       aria-haspopup="true"
-      class="absolute top-1 right-1 grid size-[26px] cursor-pointer place-content-center gap-[3px] rounded-sm border-0 bg-transparent before:absolute before:-inset-[9px] before:content-[''] hover:bg-stamp-bg hover:text-stamp focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-stamp"
+      class="absolute top-1 right-1 z-[1] grid size-[26px] cursor-pointer place-content-center gap-[3px] rounded-sm border-0 bg-transparent before:absolute before:-inset-[9px] before:content-[''] hover:bg-stamp-bg hover:text-stamp focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-stamp"
       :class="task.completed ? 'text-ink-2' : 'text-ink-3'"
       @click="onMenuButton"
     >

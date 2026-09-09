@@ -28,6 +28,8 @@ export interface TaskListProps {
  * list is the last place that knows which card is which.
  */
 export interface TaskListEmits {
+  /** A card was pressed to be read, carrying the row the copy is drawn from. */
+  detail: [task: TaskSummary]
   /** A card's 編輯 was chosen, carrying the task it belongs to. */
   edit: [task: TaskSummary]
   /** A card's 刪除 was chosen, carrying the task it belongs to. */

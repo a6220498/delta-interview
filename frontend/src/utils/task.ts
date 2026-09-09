@@ -42,6 +42,9 @@ export function displayNumber(task: Pick<Task, 'category' | 'sequence'>): string
   return `${CATEGORY_DISPLAY[task.category].prefix}-${String(task.sequence).padStart(4, '0')}`
 }
 
+/** What both renderings below print where a task has no deadline. */
+const NO_DUE_DATE = '無期限'
+
 /**
  * Renders a due date the way a board shows it: month and day only, the year
  * being noise on near-term work.
@@ -50,7 +53,29 @@ export function displayNumber(task: Pick<Task, 'category' | 'sequence'>): string
  * @returns `MM/DD`, or `無期限` when there is no deadline.
  */
 export function formatDueDate(dueDate: string | null | undefined): string {
-  return dueDate ? dueDate.slice(5).replace('-', '/') : '無期限'
+  return dueDate ? dueDate.slice(5).replace('-', '/') : NO_DUE_DATE
+}
+
+/**
+ * Renders a due date on a sheet taken out to be read, where the year is not noise
+ * and the contract's own `YYYY-MM-DD` is the least ambiguous thing to print.
+ *
+ * @param dueDate - The contract's ISO date, or `null` when there is no deadline.
+ * @returns `YYYY-MM-DD`, or `無期限` when there is no deadline.
+ */
+export function formatFullDueDate(dueDate: string | null | undefined): string {
+  return dueDate ?? NO_DUE_DATE
+}
+
+/**
+ * Renders one of the contract's timestamps to the minute. Sliced, not parsed into a
+ * `Date`: re-zoning it would make it disagree with the zone-less 到期日 beside it.
+ *
+ * @param timestamp - The contract's ISO date-time, e.g. `2026-09-05T09:12:44Z`.
+ * @returns `YYYY-MM-DD HH:mm`.
+ */
+export function formatTimestamp(timestamp: string): string {
+  return `${timestamp.slice(0, 10)} ${timestamp.slice(11, 16)}`
 }
 
 /**

@@ -341,4 +341,44 @@ describe('Card', () => {
       expect(wrapper.emitted('delete')).toHaveLength(1)
     })
   })
+
+  describe('明細入口', () => {
+    it('asks for the docket to be read, since the card itself shows no 說明', async () => {
+      // The whole card is the target — the title is a button whose overlay covers
+      // it — but the board is what owns the window, so the card only reports.
+      const wrapper = mount(Card, { props: { task: task() } })
+
+      await wrapper.get('[data-open-detail]').trigger('click')
+
+      expect(wrapper.emitted('detail')).toHaveLength(1)
+    })
+
+    it('names the docket and what pressing it does, around the title it shows', async () => {
+      // The number goes in front, and the visible title is contained in the label
+      // in full, so speech input can act on what is written on the card.
+      const wrapper = mount(Card, { props: { task: task() } })
+
+      expect(wrapper.get('[data-open-detail]').attributes('aria-label')).toBe(
+        'bug-0012 補上 CORS 設定，讓 5173 打得到 8080，檢視明細',
+      )
+    })
+
+    it('leaves the mark alone: stamping a docket is not asking to read it', async () => {
+      // The mark and the menu are the overlay's siblings, not its children, which
+      // is why neither needs to stop an event a card-wide handler would have needed.
+      const wrapper = mountAttached()
+
+      await stamp(wrapper)
+
+      expect(wrapper.emitted('detail')).toBeUndefined()
+    })
+
+    it('leaves the row-menu button alone for the same reason', async () => {
+      const wrapper = mountAttached()
+
+      await wrapper.get('[aria-haspopup]').trigger('click')
+
+      expect(wrapper.emitted('detail')).toBeUndefined()
+    })
+  })
 })

@@ -1,3 +1,4 @@
+import CardDetailDialog from '@/components/CardDetailDialog/index.vue'
 import DeleteDialog from '@/components/DeleteDialog/index.vue'
 import TaskDialog from '@/components/TaskDialog/index.vue'
 import TaskList from '@/components/TaskList/index.vue'
@@ -95,6 +96,11 @@ function sheetOf(board: Board) {
 /** The delete confirmation's own `<dialog>`. */
 function confirmOf(board: Board) {
   return board.findComponent(DeleteDialog).get('dialog')
+}
+
+/** The read-only copy's own `<dialog>`. */
+function copyOf(board: Board) {
+  return board.findComponent(CardDetailDialog).get('dialog')
 }
 
 /**
@@ -332,6 +338,66 @@ describe('App', () => {
       // One load and one POST: the create response is the whole task, so refetching
       // would be a second round trip for what the request just returned.
       expect(fetchMock).toHaveBeenCalledTimes(2)
+    })
+  })
+
+  describe('工單明細', () => {
+    it('keeps the copy mounted but down until a card is pressed', () => {
+      const wrapper = mountBoard()
+
+      expect(wrapper.findAllComponents(CardDetailDialog)).toHaveLength(1)
+      expect(copyOf(wrapper).attributes('open')).toBeUndefined()
+    })
+
+    it('opens the copy on the docket whose card was pressed', async () => {
+      // The tray attaches the row on the way up; this wiring is the only thing
+      // that turns pressing a card into a window that can be read.
+      const wrapper = mountBoard()
+      await flushPromises()
+
+      wrapper.findComponent(TaskList).vm.$emit('detail', task())
+      await flushPromises()
+
+      expect(copyOf(wrapper).attributes('open')).toBeDefined()
+      expect(copyOf(wrapper).get('[data-number]').text()).toBe('bug-0012')
+      expect(copyOf(wrapper).get('[data-title]').text()).toBe('補上 CORS 設定')
+    })
+
+    it('hands the row straight over, because the window fetches its own 說明', async () => {
+      // Unlike 編輯, nothing is awaited before opening: the row draws the whole
+      // window but one block, and only that block has any reason to wait.
+      const wrapper = mountBoard()
+      await flushPromises()
+
+      fetchMock.mockResolvedValue(jsonResponse(200, detail()))
+      wrapper.findComponent(TaskList).vm.$emit('detail', task())
+      await nextTick()
+
+      expect(copyOf(wrapper).attributes('open')).toBeDefined()
+
+      await flushPromises()
+
+      expect(lastUrl()).toBe('/api/tasks/3f1a7c2e-9b04-4f5d-8a11-6c2d5e0f7b31')
+      expect(copyOf(wrapper).get('[data-description-text]').text()).toBe(
+        '前端在 5173，後端在 8080。',
+      )
+    })
+
+    it('keeps the copy open when the 說明 cannot be fetched, and says so inside it', async () => {
+      // The opposite of 編輯, which stays down: five of this window's six fields
+      // are already in hand, and the board's own notice would be behind the modal.
+      const wrapper = mountBoard()
+      await flushPromises()
+
+      fetchMock.mockResolvedValue(
+        jsonResponse(500, { status: 500, title: 'Server Error', detail: '櫃子卡住了。' }),
+      )
+      wrapper.findComponent(TaskList).vm.$emit('detail', task())
+      await flushPromises()
+
+      expect(copyOf(wrapper).attributes('open')).toBeDefined()
+      expect(copyOf(wrapper).get('[data-description-error]').text()).toContain('櫃子卡住了。')
+      expect(wrapper.find('main [role="alert"]').exists()).toBe(false)
     })
   })
 

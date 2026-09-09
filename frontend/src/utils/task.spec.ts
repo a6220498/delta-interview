@@ -1,7 +1,14 @@
 import type { Task } from '@/types/task'
 import { describe, expect, it } from 'vitest'
 
-import { categoryDisplay, displayNumber, formatDueDate, isOverdue } from './task'
+import {
+  categoryDisplay,
+  displayNumber,
+  formatDueDate,
+  formatFullDueDate,
+  formatTimestamp,
+  isOverdue,
+} from './task'
 
 describe('displayNumber', () => {
   it.each([
@@ -39,6 +46,32 @@ describe('formatDueDate', () => {
 
   it('says a task has no deadline rather than leaving a blank the eye reads as missing data', () => {
     expect(formatDueDate(null)).toBe('無期限')
+  })
+})
+
+describe('formatFullDueDate', () => {
+  it('keeps the year, because a sheet taken out to be read is not near-term work', () => {
+    // The board drops it as noise; a docket someone is reading through has no
+    // such context, and a bare 09/07 there could be any year.
+    expect(formatFullDueDate('2026-09-07')).toBe('2026-09-07')
+  })
+
+  it('says a task has no deadline in the same words the board uses', () => {
+    expect(formatFullDueDate(null)).toBe('無期限')
+  })
+})
+
+describe('formatTimestamp', () => {
+  it('prints the calendar day and the clock time, dropping seconds and the zone', () => {
+    // Neither tells a reader anything about a docket they cannot already see,
+    // and both make the line harder to scan beside a date-only 到期日.
+    expect(formatTimestamp('2026-09-05T09:12:44Z')).toBe('2026-09-05 09:12')
+  })
+
+  it('reads an offset timestamp as the wall clock it was written in', () => {
+    // The backend answers with an offset, not Z. Parsing into a `Date` would re-zone
+    // it, so the docket could print a different day than the zone-less 到期日 above.
+    expect(formatTimestamp('2026-09-09T16:11:44.834702+08:00')).toBe('2026-09-09 16:11')
   })
 })
 

@@ -10,10 +10,15 @@ export interface CardProps {
 }
 
 /**
- * What the docket reports: the row menu's two choices, and nothing else. The mark is
- * not among them — the card files its own stamp, since that is a write it can finish.
+ * What the docket reports: the row menu's two choices and a request to read it. The
+ * mark is not among them — the card files its own stamp, a write it can finish alone.
  */
 export interface CardEmits {
+  /**
+   * The card was pressed to be read. The window it opens is the board's, not the
+   * card's: one copy on the desk, however many dockets are on the shelves.
+   */
+  detail: []
   /**
    * 編輯 was chosen in the row menu. What leaves here is the choice, not a task —
    * the shelf above knows which card it rendered and attaches it there.
