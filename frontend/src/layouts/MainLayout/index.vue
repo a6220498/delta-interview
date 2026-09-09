@@ -14,18 +14,21 @@ const emit = defineEmits<MainLayoutEmits>()
 </script>
 
 <template>
-  <!-- pb-18 (72px) keeps the last card clear of the mobile floating button. -->
-  <div class="mx-auto w-full max-w-[1060px] px-5 pb-18">
+  <!-- [AI assisted 010] 由 AI 改成滿版高度：原本頁面長度跟著托盤裡的卡片一起長，卡片一多
+       整頁就出現捲軸。改法是把外框釘死成一個視窗高的欄，中間每一層都 min-h-0，捲軸留給
+       托盤自己的清單 —— 少任何一層的 min-h-0，那一層就會用內容高度撐開，整條鏈就斷了。 -->
+
+  <div class="mx-auto flex h-dvh w-full max-w-[1060px] flex-col px-5 pb-5 max-[700px]:pb-10">
     <header class="pt-[38px]">
       <slot name="header" />
     </header>
 
-    <main>
+    <main class="flex min-h-0 flex-1 flex-col">
       <!--
         A plain <section>: with no accessible name it stays out of the landmark
         list, so the page keeps the two landmarks the layout promises.
       -->
-      <section class="mt-[54px]">
+      <section class="mt-[54px] flex min-h-0 flex-1 flex-col">
         <!--
           Baseline alignment sits title and button text on one line; the button
           opts out with self-center, since a 34px box on a baseline reads as slipped.

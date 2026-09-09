@@ -25,8 +25,8 @@ const number = computed(() => displayNumber(props.task))
  */
 let shown = false
 
-/** Where the page was scrolled to when the panel went up. */
-let openedAtScrollY = 0
+/** Where the three-dot button sat in the window when the panel went up. */
+let openedAtAnchorTop = 0
 
 /**
  * Takes the panel away and reports it once. Reported before hiding, since the echo
@@ -80,12 +80,17 @@ function choose(entry: 'edit' | 'delete'): void {
   emit('delete')
 }
 
+// [AI assisted 010] 原本比對的是 window.scrollY。托盤改成自己捲之後，捲動的是架上的
+// <ul>，window.scrollY 從頭到尾都是 0，面板會停在原地看著卡片從它底下滑走。改成量按鈕
+// 本身移動了多少，頁面捲或托盤捲都是同一件事，也不必知道是哪個容器在捲。
 /**
  * The panel is fixed to the viewport, so it goes once the card it points at has moved.
+ * Measured on the button rather than on the window: what scrolls under an open panel
+ * is the shelf's own list, which moves the button while the page stays where it is.
  * Compared against the position recorded when it opened — see `SCROLL_SLACK`.
  */
 function onScroll(): void {
-  if (Math.abs(window.scrollY - openedAtScrollY) < SCROLL_SLACK) {
+  if (Math.abs(props.anchor.getBoundingClientRect().top - openedAtAnchorTop) < SCROLL_SLACK) {
     return
   }
 
@@ -126,7 +131,9 @@ onMounted(() => {
   // Capturing, so the press is seen before the browser's light dismiss acts on it.
   // On the document: every press has to be classified, not only this card's.
   document.addEventListener('pointerdown', onPointerDown, true)
-  window.addEventListener('scroll', onScroll)
+  // Capturing: a scroll inside the shelf's list is dispatched on that list and does
+  // not bubble, so a plain listener here would only ever hear the page itself scroll.
+  window.addEventListener('scroll', onScroll, true)
   window.addEventListener('resize', onResize)
 
   const element = rowMenuEl.value
@@ -140,12 +147,12 @@ onMounted(() => {
   element.showPopover()
   shown = true
   place(element)
-  openedAtScrollY = window.scrollY
+  openedAtAnchorTop = props.anchor.getBoundingClientRect().top
 })
 
 onBeforeUnmount(() => {
   document.removeEventListener('pointerdown', onPointerDown, true)
-  window.removeEventListener('scroll', onScroll)
+  window.removeEventListener('scroll', onScroll, true)
   window.removeEventListener('resize', onResize)
 })
 </script>

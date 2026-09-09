@@ -12,14 +12,14 @@ const emit = defineEmits<TaskListEmits>()
 </script>
 
 <template>
-  <!--
-    The heavy ink edge runs along the top only, like a tray's front lip. min-h
-    keeps an empty shelf from collapsing next to a full one.
-  -->
+  <!-- [AI assisted 010] min-h-[220px] 拿掉，改成 min-h-0。那個 220px 是規格裡用來擋
+       「空架子塌在滿架子旁邊」的，現在托盤是被格線拉滿高度的，塌不了；留著反而會在視窗矮
+       的時候把外框頂出去，整頁又冒出捲軸，等於把這次要修的問題原地放回來。 -->
+
   <div
     data-tray
     :aria-busy="props.loading ? true : undefined"
-    class="flex min-h-[220px] flex-col border border-t-[3px] border-tray-edge border-t-ink bg-tray p-2.5"
+    class="flex min-h-0 flex-col border border-t-[3px] border-tray-edge border-t-ink bg-tray p-2.5"
   >
     <div class="flex items-center gap-2 px-1 pt-0.5 pb-2.5">
       <!-- Preflight strips a heading's own size and weight, so both are stated. -->
@@ -61,10 +61,21 @@ const emit = defineEmits<TaskListEmits>()
       role="list" is explicit: preflight strips the markers and some browsers drop
       list semantics with them, costing the "3 items" a reader gets up front.
     -->
+    <!--
+      [AI assisted 010] overflow-x 必須明寫 hidden。只寫 overflow-y-auto 的話，CSS 會把
+      另一軸從 visible 自動算成 auto，而卡片右上那顆 26px 的 ⋯ 鈕，字符本來就比框寬 4px
+      —— 以前 overflow 是 visible，沒人看得出來；一變成捲動容器，那 4px 就長出一條橫捲軸。
+    -->
+    <!--
+      The list is the one box on the board that scrolls: it takes the height the tray
+      has left and keeps the overflow to itself, so a shelf filling up never lengthens
+      the page. Vertically only — a docket wraps its title rather than running off the
+      side, so there is never anything to reach by scrolling across.
+    -->
     <ul
       v-else
       role="list"
-      class="flex flex-col gap-[9px]"
+      class="flex min-h-0 flex-1 flex-col gap-[9px] overflow-x-hidden overflow-y-auto"
     >
       <li
         v-for="task in props.tasks"

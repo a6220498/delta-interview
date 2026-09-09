@@ -7,7 +7,7 @@ export const PLACEMENT = {
 } as const
 
 /**
- * How far the page may scroll before an open panel is taken away, in pixels. A
- * distance, not a bare scroll event, which could arrive in the breath after opening.
+ * How far the three-dot button may move before an open panel is taken away, in pixels.
+ * A distance, not a bare scroll event, which could arrive in the breath after opening.
  */
 export const SCROLL_SLACK = 2

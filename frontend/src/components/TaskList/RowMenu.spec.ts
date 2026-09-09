@@ -54,7 +54,6 @@ beforeEach(() => {
   // figures below are read against a window this file states the size of.
   Object.defineProperty(window, 'innerWidth', { value: 1024, configurable: true })
   Object.defineProperty(window, 'innerHeight', { value: 768, configurable: true })
-  Object.defineProperty(window, 'scrollY', { value: 0, configurable: true, writable: true })
 })
 
 afterEach(() => {
@@ -254,11 +253,26 @@ describe('RowMenu', () => {
 
   describe('跟著版面走', () => {
     it('goes once the page has scrolled out from under it', () => {
-      // The panel is fixed to the window and the card it points at is not.
-      const menu = mountMenu()
+      // The panel is fixed to the window and the card it points at is not, so the
+      // button is where the movement shows: 40px up the window is 40px away.
+      const button = anchorAt()
+      const menu = mountMenu(button)
 
-      Object.defineProperty(window, 'scrollY', { value: 40, configurable: true })
+      button.getBoundingClientRect = () => rectOf({ ...BUTTON, top: 60, bottom: 86 })
       window.dispatchEvent(new Event('scroll'))
+
+      expect(showing.has(panelOf(menu))).toBe(false)
+      expect(menu.emitted('close')).toEqual([[false]])
+    })
+
+    it('goes when the shelf under it scrolls rather than the page', () => {
+      // The board's shelves scroll inside themselves and the window never moves, so
+      // the event is dispatched on the scrolling box and caught on the way down.
+      const button = anchorAt()
+      const menu = mountMenu(button)
+
+      button.getBoundingClientRect = () => rectOf({ ...BUTTON, top: 60, bottom: 86 })
+      document.body.dispatchEvent(new Event('scroll'))
 
       expect(showing.has(panelOf(menu))).toBe(false)
       expect(menu.emitted('close')).toEqual([[false]])
@@ -267,9 +281,10 @@ describe('RowMenu', () => {
     it('stays put for a scroll event that moved nothing', () => {
       // A scroll already queued when the panel opens would otherwise close it
       // in the same breath as opening it.
-      const menu = mountMenu()
+      const button = anchorAt()
+      const menu = mountMenu(button)
 
-      Object.defineProperty(window, 'scrollY', { value: 1, configurable: true })
+      button.getBoundingClientRect = () => rectOf({ ...BUTTON, top: 101, bottom: 127 })
       window.dispatchEvent(new Event('scroll'))
 
       expect(showing.has(panelOf(menu))).toBe(true)

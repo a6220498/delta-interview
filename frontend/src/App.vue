@@ -162,11 +162,13 @@ function openDelete(task: TaskSummary): void {
       :counts="rackCounts"
     />
 
-    <!--
-      Two equal columns, one below 880px where a pair of trays cannot hold a stub
-      and title side by side. items-start lets a short tray keep its own height.
-    -->
-    <div class="grid grid-cols-2 items-start gap-[14px] max-[880px]:grid-cols-1">
+    <!-- [AI assisted 010] items-start 換成滿高：卡片一多，托盤原本會一路往下長把整頁撐出
+         捲軸。auto-rows 用 minmax(0,1fr) 是為了同時吃三種版型 —— 兩欄一列、一欄兩列，
+         以及 700px 以下只剩一架時的一欄一列 —— 每一種都是把可用高度分完，不看內容。 -->
+
+    <div
+      class="grid min-h-0 flex-1 auto-rows-[minmax(0,1fr)] grid-cols-2 gap-[14px] max-[880px]:grid-cols-1"
+    >
       <TaskList
         v-for="rack in TASK_RACKS"
         :key="rack.id"
