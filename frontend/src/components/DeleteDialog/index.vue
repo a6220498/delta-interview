@@ -3,15 +3,22 @@
  * The delete confirmation: `TaskDialog`'s sheet with a red top rule and one question.
  * `role="alertdialog"`, focus on 取消, and it decides nothing — it reports and waits.
  */
-import { computed, nextTick, shallowRef, useId, useTemplateRef } from 'vue'
+import { computed, nextTick, ref, shallowRef, useId, useTemplateRef } from 'vue'
+import { useTasksStore } from '@/stores/tasks'
 import { displayNumber } from '@/utils/task'
 
-import type { Task } from '@/types/task'
+import type { TaskSummary } from '@/types/task'
 import type { DeleteDialogEmits, DeleteDialogExposed } from './types'
 
 
 
 const emit = defineEmits<DeleteDialogEmits>()
+
+/**
+ * The tasks, and the request that withdraws one. The store rather than an answer handed
+ * up to the board: this sheet is the only thing that knows which docket it is asking about.
+ */
+const tasksStore = useTasksStore()
 
 /**
  * Prefix for this sheet's element ids. Generated, so two confirmations mounted at
@@ -23,10 +30,16 @@ const deleteDialogEl = useTemplateRef<HTMLDialogElement>('deleteDialogEl')
 const cancelButton = useTemplateRef<HTMLButtonElement>('cancelButton')
 
 /**
- * The task the question is about, or `null` while nothing is being asked.
- * `shallowRef`: the sheet reads two fields off it and never writes one back.
+ * The task the question is about, or `null` while nothing is being asked. A row, not a
+ * whole task: `shallowRef`, since the sheet reads three fields and writes none back.
  */
-const target = shallowRef<Task | null>(null)
+const target = shallowRef<TaskSummary | null>(null)
+
+/**
+ * Why the last delete came back refused, or empty while none has. Not the store's
+ * `error`: that one raises the board's 工單載不出來, which sits behind this modal.
+ */
+const deleteError = ref('')
 
 /** The docket's number, e.g. `bug-0012`; empty while the sheet is down. */
 const number = computed(() => (target.value ? displayNumber(target.value) : ''))
@@ -39,8 +52,9 @@ const title = computed(() => target.value?.title ?? '')
  *
  * @param task - The task being proposed for deletion.
  */
-function open(task: Task): void {
+function open(task: TaskSummary): void {
   target.value = task
+  deleteError.value = ''
 
   const element = deleteDialogEl.value
 
@@ -72,17 +86,40 @@ function close(): void {
 
 defineExpose<DeleteDialogExposed>({ open, close })
 
-// [AI assisted 006] 確定不會自己關窗：刪除可能失敗（404、斷線），關窗留給呼叫端在
-// DELETE 回來之後做。跟 TaskDialog 的 submit 同一條規則。
 /**
- * Hands the answer up, with the docket it is about. The guard is unreachable through
- * the interface, and upholds the promise `DeleteDialogEmits` makes.
+ * Whether a delete is on the wire. A plain `let`: nothing draws it, and a spinner that
+ * appears and vanishes inside a frame is worse than none at all.
  */
-function onConfirm(): void {
+let deleting = false
+
+// [AI assisted 006] 確定不會馬上關窗：刪除可能失敗（404、斷線），關窗留到 DELETE
+// 回來之後才做。跟 TaskDialog 的存檔同一條規則。
+/**
+ * Withdraws the docket the question names, then takes the question away. A refusal is
+ * printed on the paper instead, which is why the sheet is still up to hold it.
+ */
+async function onConfirm(): Promise<void> {
   const task = target.value
 
-  if (task) {
-    emit('confirm', task)
+  // A guard rather than a disabled button: a second 確定 sends a second DELETE, and
+  // the 404 it comes back with would report a delete that worked as one that failed.
+  if (deleting || !task) {
+    return
+  }
+
+  // Cleared first: what is on the paper is about the previous attempt.
+  deleteError.value = ''
+  deleting = true
+
+  try {
+    await tasksStore.deleteTask(task.id)
+    close()
+  } catch (cause) {
+    // Not only `ApiError`: `fetch` itself rejects with a TypeError when the
+    // backend is not running, which is the likeliest failure in development.
+    deleteError.value = cause instanceof Error ? cause.message : String(cause)
+  } finally {
+    deleting = false
   }
 }
 </script>
@@ -139,6 +176,24 @@ function onConfirm(): void {
         class="text-[12.5px] text-ink-2"
       >
         單子會從架上撤掉，這個動作無法復原。
+      </p>
+
+      <!--
+        A refused delete says so here, on the question that is still up. The only row
+        that is not drawn while empty: nothing sits below it but the two buttons.
+      -->
+      <p
+        v-if="deleteError"
+        data-delete-error
+        role="alert"
+        class="rounded-sm border border-alert bg-alert-bg px-[11px] py-[9px]"
+      >
+        <strong class="block font-display text-[15px] tracking-[0.01em] text-alert">
+          這張單子沒撤掉
+        </strong>
+
+        <!-- The server's own problem detail: 沒撤掉 alone gives nothing to act on. -->
+        <span class="text-[12.5px] text-ink-2">{{ deleteError }}</span>
       </p>
 
       <!--

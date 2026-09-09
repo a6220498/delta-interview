@@ -1,4 +1,10 @@
-import { createTask as postTask, getTask, listTasks, updateTask as putTask } from '@/api/tasks'
+import {
+  createTask as postTask,
+  deleteTask as removeTask,
+  getTask,
+  listTasks,
+  updateTask as putTask,
+} from '@/api/tasks'
 import type {
   CreateTaskRequest,
   Task,
@@ -107,5 +113,21 @@ export const useTasksStore = defineStore('tasks', () => {
     return updated
   }
 
-  return { taskList, loading, error, fetchTasks, fetchTask, createTask, updateTask }
+  /**
+   * Withdraws a task through `DELETE /api/tasks/{id}` and takes its row off the board.
+   * Throws rather than setting {@link error}: the caller still holds the confirmation.
+   *
+   * @param id - The task to delete.
+   * @returns Resolves once the row is off {@link taskList}.
+   * @throws {ApiError} 404 when the task was already gone.
+   */
+  async function deleteTask(id: string): Promise<void> {
+    await removeTask(id)
+
+    // The 204 answers with nothing, so the row is dropped here rather than by
+    // reloading the board for a list already known but for this one task.
+    taskList.value = taskList.value.filter((filed) => filed.id !== id)
+  }
+
+  return { taskList, loading, error, fetchTasks, fetchTask, createTask, updateTask, deleteTask }
 })

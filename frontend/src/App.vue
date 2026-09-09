@@ -17,7 +17,7 @@ import type { TaskSummary } from '@/types/task'
 
 /**
  * The board's tasks, and how the load that fetched them went. `storeToRefs` keeps the
- * reactivity plain destructuring would drop. `toggle` and `delete` are still unhandled.
+ * reactivity plain destructuring would drop. `toggle` is the one tray event still unhandled.
  */
 const tasksStore = useTasksStore()
 const { taskList, loading, error } = storeToRefs(tasksStore)
@@ -81,17 +81,19 @@ async function openEdit(task: TaskSummary): Promise<void> {
 }
 
 /**
- * The confirmation, held the same way as the sheet above. Held but not yet raised —
- * wiring 刪除 to `open(task)` belongs to the step that can also delete.
+ * The confirmation, held the same way as the sheet above. Raising it is likewise all
+ * the board does with it: the docket it names is withdrawn by the confirmation itself.
  */
 const deleteDialogEl = useTemplateRef<DeleteDialogExposed>('deleteDialogEl')
 
 /**
- * Closes an answered confirmation, and nothing else — for now. The task is dropped
- * rather than spliced out: there is no `DELETE` yet, and the next load would restore it.
+ * Asks before withdrawing a docket. The row is handed straight over, unfetched: the
+ * question shows a number and a title, and the shelf is already holding both.
+ *
+ * @param task - The row whose 刪除 was pressed.
  */
-function onConfirmDelete(): void {
-  deleteDialogEl.value?.close()
+function openDelete(task: TaskSummary): void {
+  deleteDialogEl.value?.open(task)
 }
 </script>
 
@@ -124,6 +126,7 @@ function onConfirmDelete(): void {
         :tasks="tasksFor(rack)"
         :loading="loading"
         @edit="openEdit"
+        @delete="openDelete"
       />
     </div>
   </MainLayout>
@@ -135,11 +138,8 @@ function onConfirmDelete(): void {
   <TaskDialog ref="taskDialogEl" />
 
   <!--
-    The confirmation, mounted beside the sheet for the same two reasons. `open(task)`
-    is the only thing that raises it, and an event is what answers it.
+    The confirmation, mounted beside the sheet for the same two reasons. Nothing is
+    bound on it either: it withdraws the docket it named and closes itself once it has.
   -->
-  <DeleteDialog
-    ref="deleteDialogEl"
-    @confirm="onConfirmDelete"
-  />
+  <DeleteDialog ref="deleteDialogEl" />
 </template>

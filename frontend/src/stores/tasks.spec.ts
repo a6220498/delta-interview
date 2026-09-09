@@ -359,4 +359,49 @@ describe('tasks store', () => {
       expect(store.error).toBeNull()
     })
   })
+
+  describe('deleteTask', () => {
+    const ID = '3f1a7c2e-9b04-4f5d-8a11-6c2d5e0f7b31'
+
+    it("sends a DELETE to the docket's own endpoint", async () => {
+      fetchMock.mockResolvedValue(new Response(null, { status: 204 }))
+      const store = useTasksStore()
+
+      await store.deleteTask(ID)
+
+      expect(lastUrl()).toBe(`/api/tasks/${ID}`)
+      expect(lastInit().method).toBe('DELETE')
+    })
+
+    it('takes the deleted row off the board and leaves the rest where they were', async () => {
+      // The 204 answers with no list, so this is what keeps the shelves honest
+      // short of refetching the whole board for one row that is known to be gone.
+      const store = useTasksStore()
+      fetchMock.mockResolvedValue(
+        jsonResponse(200, [task({ id: 'a' }), task({ id: 'b' }), task({ id: 'c' })]),
+      )
+      await store.fetchTasks()
+
+      fetchMock.mockResolvedValue(new Response(null, { status: 204 }))
+      await store.deleteTask('b')
+
+      expect(store.taskList.map((filed) => filed.id)).toEqual(['a', 'c'])
+    })
+
+    it('leaves the board untouched when the delete is refused', async () => {
+      // A row taken off here would hide a task the server still holds, and the
+      // reason belongs on the confirmation the caller is still holding up.
+      const store = useTasksStore()
+      fetchMock.mockResolvedValue(jsonResponse(200, [task({ id: 'a' })]))
+      await store.fetchTasks()
+
+      fetchMock.mockResolvedValue(
+        jsonResponse(404, { status: 404, title: 'Not Found', detail: '這張單子已經不在了。' }),
+      )
+
+      await expect(store.deleteTask('a')).rejects.toThrow('這張單子已經不在了。')
+      expect(store.taskList.map((filed) => filed.id)).toEqual(['a'])
+      expect(store.error).toBeNull()
+    })
+  })
 })

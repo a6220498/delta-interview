@@ -346,43 +346,53 @@ describe('App', () => {
       expect(sheetOf(wrapper).attributes('open')).toBeUndefined()
     })
 
-    it('closes the confirmation when it is answered', async () => {
-      // Raised through `open()` directly, since nothing on the board reaches it yet.
-      // Under test: an answered question is taken away by the board, not by itself.
+    it('raises the confirmation on the docket the row asked about', async () => {
+      // The row menu reports 刪除 and decides nothing, so this wiring is the only
+      // thing that turns it into a question — and it has to name the right docket.
       const wrapper = mountBoard()
-      const confirmation = wrapper.findComponent(DeleteDialog)
-
-      confirmation.vm.open(task())
-      await nextTick()
-      expect(confirmOf(wrapper).attributes('open')).toBeDefined()
-
-      confirmation.vm.$emit('confirm', task())
-      await nextTick()
-
-      expect(confirmOf(wrapper).attributes('open')).toBeUndefined()
-    })
-
-    it('leaves 刪除 unwired for now, so nothing on the board can raise it', async () => {
-      // Deliberate, and pinned so it is noticed when it changes: the row menu reports
-      // 刪除 and the board does not listen. Connecting them needs somewhere to delete.
-      const wrapper = mountBoard()
+      await flushPromises()
 
       wrapper.findComponent(TaskList).vm.$emit('delete', task())
       await nextTick()
 
-      expect(confirmOf(wrapper).attributes('open')).toBeUndefined()
+      expect(confirmOf(wrapper).attributes('open')).toBeDefined()
+      expect(confirmOf(wrapper).get('[data-number]').text()).toBe('bug-0012')
+      expect(confirmOf(wrapper).get('[data-quote]').text()).toBe('補上 CORS 設定')
     })
 
-    it('takes nothing off the board when a delete is confirmed', async () => {
-      // Only closes it. Removing the task is the store's step, and a board that
-      // forgot a task the server still holds would put it back on the next load.
+    it('asks the question without fetching the docket first', async () => {
+      // Unlike 編輯: the question shows a number and a title, both of which the row
+      // already carries, so a second GET would buy the reader nothing.
       const wrapper = mountBoard()
-      const before = wrapper.findComponent(TaskList).props('tasks')
+      await flushPromises()
 
-      wrapper.findComponent(DeleteDialog).vm.$emit('confirm', task())
+      wrapper.findComponent(TaskList).vm.$emit('delete', task())
+      await flushPromises()
+
+      expect(fetchMock).toHaveBeenCalledTimes(1)
+      expect(lastUrl()).toBe('/api/tasks')
+    })
+
+    it('takes a docket the confirmation deleted off the shelf', async () => {
+      // The seam: nothing is bound between the two, so what clears the row is the
+      // store they share, and the 204 settles it without a second load.
+      fetchMock.mockResolvedValue(
+        jsonResponse(200, [task({ id: 'a' }), task({ id: 'b', title: '換掉錯字' })]),
+      )
+      const wrapper = mountBoard()
+      await flushPromises()
+
+      wrapper.findComponent(TaskList).vm.$emit('delete', task({ id: 'b', title: '換掉錯字' }))
       await nextTick()
 
-      expect(wrapper.findComponent(TaskList).props('tasks')).toEqual(before)
+      fetchMock.mockResolvedValue(new Response(null, { status: 204 }))
+      await wrapper.findComponent(DeleteDialog).get('[data-confirm]').trigger('click')
+      await flushPromises()
+
+      expect(wrapper.get('main').text()).not.toContain('換掉錯字')
+      expect(wrapper.get('main').text()).toContain('補上 CORS 設定')
+      expect(confirmOf(wrapper).attributes('open')).toBeUndefined()
+      expect(fetchMock).toHaveBeenCalledTimes(2)
     })
   })
 })
