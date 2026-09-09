@@ -2,6 +2,13 @@
 
 Vue 3 前端與 Spring Boot 3 後端，兩邊的 API 型別都由**同一份 OpenAPI 契約產生**。
 
+![看板 — 桌機版：未完成與已完成兩個托盤，卡片上有工單編號、逾期紅標與完成戳章](docs/screenshot-board.png)
+
+<img src="docs/screenshot-mobile.png" alt="看板 — 375px 版型：架別切換與右下角浮動新增鈕" width="300">
+
+> 卡片上的 `feat-0003` / `bug-0002` 是 `category` + `sequence` 算出來的，逾期紅標是前端
+> 依 `dueDate` 判斷的 —— 兩者都**不是**契約裡的欄位，理由見〈[領域模型](#領域模型)〉。
+
 ```
 delta-interview/
 ├── api/
@@ -13,6 +20,10 @@ delta-interview/
 ```
 
 ## 契約優先 (Contract-first)
+
+契約在 [`api/openapi.yaml`](api/openapi.yaml)；後端啟動後可直接瀏覽
+<http://localhost:8080/swagger-ui.html>，或抓契約原檔
+<http://localhost:8080/openapi.yaml>（啟動方式見〈快速開始〉）。
 
 `api/openapi.yaml` 定義了全部 5 個任務操作。兩端都**不手寫傳輸型別**：
 
@@ -276,8 +287,10 @@ frontend/src/
   只有這個元件用得到的常數與型別放它自己的 `const/` 與 `types/`。共用的才升到
   `src/const/`、`src/types/` —— 例如三顆寫入按鈕共用的節流毫秒數。
 - **Tailwind 4** 沒有 `tailwind.config.js`，設計 token 全部寫在 `src/style.css` 的
-  `@theme` 區塊；深色模式由 `prefers-color-scheme` 重新定義同一組 token 完成，
-  模板中不出現 `dark:` variant。
+  `@theme` 區塊。刻意**只有淺色一套**：紙本工單的隱喻在深色底下不成立，因此
+  `:root` 釘上 `color-scheme: light`，連瀏覽器自己的 UI（日期選擇器、下拉、捲軸、
+  `::backdrop`）一起鎖住 —— 那些是 token 覆寫**管不到**、但主題不一致就會露餡的地方。
+  模板中因此不出現 `dark:` variant。
 - **SCSS** 只補 Tailwind 表達不了的部分（例：`prefers-reduced-motion` 保護的動畫）。
   透過 Vite 的 `loadPaths` 設定，任何元件都可以直接 `@use 'core' as core;`。
 
@@ -298,3 +311,14 @@ persistence entity 與轉換即可，controller 與契約都不需要變動。
 倉庫一律存整張任務；**收窄成 `TaskSummary` 是在 `TaskController` 做的**。回應帶哪些欄位
 是契約的決定，倉庫的職責則是把任務完整地留著 —— 一個只發得出摘要的倉庫，就沒有東西可以
 回答 `GET /api/tasks/{id}` 了。
+
+## AI 使用說明
+
+本專案全程由 AI（Claude Code）協助開發。使用它的理由是這份作業的成本集中在**產生樣板**
+（契約 → 兩端型別 → controller → 元件 → 測試）與**同步改寫**（改一次契約要一路帶到
+後端、前端、測試與文件）；設計決策與取捨仍然逐項裁示，紀錄裡保留了被否決的方案。
+
+程式碼中的 `// [AI assisted NNN]` 註解，`NNN` 對應 [`chat-records/`](chat-records/)
+底下的對話編號。每一則紀錄保留使用者訊息全文、該次改動的決策理由與被否決的替代方案；
+編號索引、各次對話的產出，以及**兩個已知的編號缺口（007／010）**，見
+[`chat-records/README.md`](chat-records/README.md)。
