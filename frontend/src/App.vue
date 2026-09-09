@@ -24,7 +24,7 @@ import type { TaskSummary } from '@/types/task'
  * through the trays is how two components end up disagreeing about what is on
  * the shelf.
  *
- * `storeToRefs` rather than reading `tasksStore.tasks` in the template: it
+ * `storeToRefs` rather than reading `tasksStore.taskList` in the template: it
  * keeps the reactivity that plain destructuring would drop, without the board
  * having to name the store on every line.
  *
@@ -32,7 +32,7 @@ import type { TaskSummary } from '@/types/task'
  * own step; this one only fills the board.
  */
 const tasksStore = useTasksStore()
-const { tasks, loading, error } = storeToRefs(tasksStore)
+const { taskList, loading, error } = storeToRefs(tasksStore)
 
 /**
  * Fills the board on first paint.
@@ -70,7 +70,7 @@ function reload(): void {
  * @returns The tasks in that completion state, in board order.
  */
 function tasksFor(rack: TaskRack): TaskSummary[] {
-  return tasks.value.filter((task) => task.completed === rack.completed)
+  return taskList.value.filter((task) => task.completed === rack.completed)
 }
 
 /**

@@ -77,7 +77,7 @@ describe('tasks store', () => {
       await store.fetchTasks()
 
       expect(lastUrl()).toBe('/api/tasks')
-      expect(store.tasks).toEqual(loaded)
+      expect(store.taskList).toEqual(loaded)
     })
 
     it('replaces the previous list rather than appending to it', async () => {
@@ -90,7 +90,7 @@ describe('tasks store', () => {
       fetchMock.mockResolvedValue(jsonResponse(200, [task({ id: 'a' })]))
       await store.fetchTasks()
 
-      expect(store.tasks).toHaveLength(1)
+      expect(store.taskList).toHaveLength(1)
     })
 
     it('hands the filter to the server instead of trimming the list here', async () => {
@@ -168,7 +168,7 @@ describe('tasks store', () => {
       fetchMock.mockResolvedValue(jsonResponse(500, { status: 500, title: 'Server error' }))
       await store.fetchTasks()
 
-      expect(store.tasks).toHaveLength(1)
+      expect(store.taskList).toHaveLength(1)
     })
 
     it('clears the error once a later load succeeds', async () => {
@@ -220,7 +220,7 @@ describe('tasks store', () => {
       settle(jsonResponse(200, detail()))
       await pending
 
-      expect(store.tasks.map((filed) => filed.id)).toEqual(['a'])
+      expect(store.taskList.map((filed) => filed.id)).toEqual(['a'])
     })
 
     it('hands back null rather than throwing when the docket cannot be fetched', async () => {

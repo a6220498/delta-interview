@@ -29,13 +29,13 @@ export const useTasksStore = defineStore('tasks', () => {
    * detail the board never received. {@link fetchTask} is where the whole task
    * comes from.
    */
-  const tasks = ref<TaskSummary[]>([])
+  const taskList = ref<TaskSummary[]>([])
 
   /**
    * Whether a load is currently in flight.
    *
    * The board needs this to tell "nothing on the shelf" apart from "not back
-   * yet": both are an empty `tasks`, and only one of them should say 架上沒有單子.
+   * yet": both are an empty `taskList`, and only one of them should say 架上沒有單子.
    */
   const loading = ref(false)
 
@@ -59,7 +59,7 @@ export const useTasksStore = defineStore('tasks', () => {
    *
    * Failures are recorded in {@link error} instead of being re-thrown: a load
    * that fails is a state the board draws, not an exception every call site
-   * would have to wrap. A failed load also leaves the previous {@link tasks} in
+   * would have to wrap. A failed load also leaves the previous {@link taskList} in
    * place — "we could not check" is not "the tasks are gone", and blanking the
    * board would hide work the server still holds.
    *
@@ -71,7 +71,7 @@ export const useTasksStore = defineStore('tasks', () => {
     error.value = null
 
     try {
-      tasks.value = await listTasks(filter)
+      taskList.value = await listTasks(filter)
     } catch (cause) {
       // Not only `ApiError`: `fetch` itself rejects with a TypeError when the
       // backend is not running, which is the likeliest failure in development.
@@ -95,7 +95,7 @@ export const useTasksStore = defineStore('tasks', () => {
    * because a 編輯 that quietly does nothing cannot be told apart from a broken
    * button.
    *
-   * Deliberately leaves {@link tasks} and {@link loading} alone. `loading` is
+   * Deliberately leaves {@link taskList} and {@link loading} alone. `loading` is
    * the board's own flag — it is what puts 載入中 in both trays — and one
    * docket being fetched is not the shelves being refetched. A success does not
    * clear {@link error} either: a refresh that failed has still failed, and the
@@ -115,5 +115,5 @@ export const useTasksStore = defineStore('tasks', () => {
     }
   }
 
-  return { tasks, loading, error, fetchTasks, fetchTask }
+  return { taskList, loading, error, fetchTasks, fetchTask }
 })
