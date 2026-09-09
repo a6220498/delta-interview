@@ -1,23 +1,7 @@
 <script setup lang="ts">
 /**
- * One task, drawn as a paper docket: a perforated stub on the left carrying the
- * category mark and the number, the title and its two controls on the right.
- *
- * The card renders state and reports intent; it decides nothing: completion,
- * 編輯 and 刪除 all leave as events, so the card never learns what finishing a
- * task costs or what becomes of a deleted one.
- *
- * The row menu is the one thing it does hold. The panel hangs from this card's
- * own three-dot button, which makes whether it is up the card's fact rather
- * than the board's — and it is rendered only while it is up, so a shelf of
- * dockets carries no hidden panel apiece.
- *
- * Three states share this one template, and each differs in shape as well as in
- * colour — the board has to stay readable to someone who cannot tell the red
- * from the purple. Open is the plain docket; overdue reddens the stub and adds a
- * 逾期 tag; done switches to the second-copy stock, strikes the title through
- * and stamps the card. Overdue is layered on open and disappears once stamped,
- * which is why `stub` tests `completed` first.
+ * One task drawn as a paper docket. It renders state and reports intent, deciding
+ * nothing; its three states differ in shape as well as colour, never colour alone.
  */
 import { computed, ref, useTemplateRef } from 'vue'
 
@@ -37,11 +21,8 @@ const overdue = computed(() => isOverdue(props.task))
 const stateLabel = computed(() => (props.task.completed ? LABELS.done : LABELS.open))
 
 /**
- * The stub's paper and ink for the card's current state, plus the colour the
- * mark's letter is knocked out in.
- *
- * Kept as one object so the knockout can never fall out of step with the paper
- * behind it — a solid mark whose letter is painted the wrong colour disappears.
+ * The stub's paper, ink and knockout colour for the current state. One object, so
+ * the knockout cannot fall out of step with the paper behind it.
  */
 const stub = computed(() => {
   if (props.task.completed) {
@@ -59,35 +40,19 @@ const markLabel = computed(
 )
 
 /**
- * The three-dot button, held so the menu can be hung from it.
- *
- * A ref rather than the click event's `currentTarget`, which is typed as a bare
- * `EventTarget` and would have to be cast back to an element on every press —
- * and which is only correct while the event is being dispatched.
+ * The three-dot button, held so the menu can be hung from it. A ref rather than the
+ * click event's `currentTarget`, which is a bare `EventTarget` and short-lived.
  */
 const menuButton = useTemplateRef<HTMLButtonElement>('menuButton')
 
-// [AI assisted 006] 面板歸卡片、關閉時整個不渲染，是使用者的裁示（「我搞錯了, 請幫我把
-// row menu 放到 TaskList 資料夾裡下 … 如果 row menu 沒有打開時, 請使用 v-if=false」），
-// 推翻了前一版「板子持有一個共用面板」的做法。連帶的必然結果是面板不能再用
-// defineExpose 的 open() / close()：沒渲染就沒有對象可呼叫，所以改成 props 進、事件出，
-// 而「選單開著沒有」這件事只留這一份、在卡片手上。
+// [AI assisted 006] 面板歸卡片、關閉時不渲染，是使用者的裁示，推翻了前一版共用面板的做法。
+// 沒渲染就沒有對象可呼叫，所以面板改成 props 進、事件出，開關狀態只留卡片這一份。
 /** Whether this card's row menu is up, which is also whether it is rendered. */
 const menuOpen = ref(false)
 
 /**
- * Whether the press that last took the menu away landed on this very button.
- *
- * Plain `let`, because nothing on the page is drawn from it. It is what makes
- * the three-dot button a switch: the browser dismisses the panel on
- * `pointerdown`, so the `click` that same press produces arrives at a card
- * whose menu is already down and looks exactly like the press that opened it.
- * The panel is the only thing that can tell those apart, and says which kind of
- * dismissal it was on its way out.
- *
- * Read and cleared by the next press on the button. A press that never becomes
- * a click — held down, dragged off the button, released elsewhere — leaves it
- * set and costs that one button a single press.
+ * Whether the press that last took the menu away landed on this very button — what
+ * makes the three-dot button a switch, since the popover dismisses on `pointerdown`.
  */
 let dismissedByButton = false
 
@@ -121,9 +86,8 @@ function onMenuClose(byButton: boolean): void {
     :class="task.completed ? 'bg-stock-2' : 'bg-stock'"
   >
     <!--
-      The stub's two round punches are painted the tray's colour, so the card
-      reads as pierced rather than as decorated. They sit outside the stub's
-      box, which is why the stub is the positioning context.
+      The two round punches are painted the tray's colour, so the card reads as
+      pierced. They sit outside the stub's box, hence the positioning context.
     -->
     <div
       class="relative flex flex-col items-center justify-center gap-[7px] rounded-l-sm border-r border-dashed border-rule py-2 before:absolute before:-top-1 before:-right-1 before:size-[7px] before:rounded-full before:bg-tray before:content-[''] after:absolute after:-right-1 after:-bottom-1 after:size-[7px] after:rounded-full after:bg-tray after:content-['']"
@@ -131,8 +95,7 @@ function onMenuClose(byButton: boolean): void {
     >
       <!--
         Filled for bug, outlined for feature. Hidden from assistive tech: the
-        number below already spells the category out, so announcing the mark
-        would say it twice.
+        number below already spells the category out.
       -->
       <span
         data-category
@@ -151,10 +114,7 @@ function onMenuClose(byButton: boolean): void {
     </div>
 
     <div class="min-w-0 px-[11px] pt-[9px] pb-2">
-      <!--
-        anywhere lets an unbroken string wrap mid-word instead of widening the
-        card; pr-26px keeps the last line clear of the menu button above it.
-      -->
+      <!-- anywhere wraps an unbroken string mid-word; pr-26px clears the menu button. -->
       <p
         class="mb-2 pr-[26px] font-display text-[17px] leading-[1.3] font-medium [overflow-wrap:anywhere]"
         :class="
@@ -166,11 +126,8 @@ function onMenuClose(byButton: boolean): void {
 
       <div class="flex flex-wrap items-center gap-2">
         <!--
-          The visible box is 24px; the ::before overlay grows the hit area to
-          44px without moving anything on the page. 11px rather than the spec's
-          10px because the overlay is inset from the padding box, so the
-          button's own 1px border has to be paid for on each side — at 10px the
-          target measures 42px and misses the 44px minimum the spec asks for.
+          The ::before overlay grows the 24px box to a 44px hit area. 11px, not the
+          spec's 10px: the overlay insets from the padding box, so the border is paid twice.
         -->
         <button
           type="button"
@@ -203,9 +160,8 @@ function onMenuClose(byButton: boolean): void {
         >
           {{ formatDueDate(task.dueDate) }}
           <!--
-            A real element rather than the spec's CSS `content`, which assistive
-            tech is not required to announce. Overdue is the one state that
-            costs the reader something, so it may not be colour-only.
+            A real element rather than the spec's CSS `content`, which assistive tech
+            need not announce: overdue costs the reader something, so never colour-only.
           -->
           <span
             v-if="overdue"
@@ -235,13 +191,8 @@ function onMenuClose(byButton: boolean): void {
     </button>
 
     <!--
-      Written inside the card and drawn outside it: a popover renders in the top
-      layer wherever it sits in the markup, so this is next to the button it
-      belongs to without being clipped by the tray around it.
-
-      `menuButton` is in the condition as well as in the prop because the panel
-      cannot be placed against a button that has not been rendered yet — and
-      because that is what tells the type checker the same thing.
+      A popover renders in the top layer wherever it sits in the markup, so it is
+      not clipped by the tray. `menuButton` is in the condition: no button, no anchor.
     -->
     <RowMenu
       v-if="menuOpen && menuButton"

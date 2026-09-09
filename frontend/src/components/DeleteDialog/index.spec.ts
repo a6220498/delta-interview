@@ -6,16 +6,8 @@ import { defineComponent, h, nextTick } from 'vue'
 import DeleteDialog from './index.vue'
 
 /**
- * jsdom 30 ships `<dialog>` as an element but almost none of its behaviour:
- * the prototype carries the reflected `open` property and nothing else, so
- * `showModal` is not a function at all and opening the sheet would throw before
- * a single assertion ran.
- *
- * These stand-ins do the two things the component actually depends on — `open`
- * flipping, and `close` firing the event the browser fires when Esc dismisses a
- * dialog. Everything the real element does beyond that (the top layer, the focus
- * trap, the backdrop) is the browser's, is untestable here, and is exactly why
- * the component uses a native dialog instead of building its own.
+ * jsdom 30 ships `<dialog>` with the reflected `open` and nothing else. These stand-ins
+ * do the two things the component depends on: `open` flipping, and `close` firing.
  */
 beforeEach(() => {
   HTMLDialogElement.prototype.showModal = function showModal(this: HTMLDialogElement): void {
@@ -57,10 +49,8 @@ function mountSheet() {
 }
 
 /**
- * Mounts the confirmation and asks about `subject`.
- *
- * Awaited because the number and the title are written as the sheet opens, so
- * the DOM is one tick behind the call.
+ * Mounts the confirmation and asks about `subject`. Awaited, since the number and
+ * title are written as the sheet opens and the DOM is a tick behind.
  */
 async function mountAsking(subject: Task = task()) {
   const wrapper = mountSheet()
@@ -232,10 +222,8 @@ describe('DeleteDialog', () => {
     })
 
     it('gives two confirmations on one page two sets of ids', () => {
-      // Hard-coded ids would leave one sheet described by the other one's
-      // warning. Both are mounted inside one app on purpose: `useId` counts per
-      // app, so two separate `mount()` calls would both start at the same
-      // number and the test would pass on components that share every id.
+      // Hard-coded ids would leave one sheet described by the other's warning. Both
+      // mounted in one app: `useId` counts per app, so separate mounts would collide.
       const wrapper = mount(
         defineComponent({
           render: () => [h(DeleteDialog), h(DeleteDialog)],

@@ -1,10 +1,8 @@
 import type { Problem } from '@/types/task'
 
 /**
- * A non-2xx response from the task API, carrying the server's problem details.
- *
- * Exists so callers can branch on `status` (a 404 is a normal outcome the UI
- * should explain; a 500 is not) instead of string-matching a generic `Error`.
+ * A non-2xx response from the task API, carrying the server's problem details so
+ * callers can branch on `status` instead of string-matching a generic `Error`.
  */
 export class ApiError extends Error {
   readonly status: number
@@ -25,10 +23,7 @@ export class ApiError extends Error {
 
 /**
  * Performs a JSON request against the backend and unwraps a typed body.
- *
- * Centralised so every operation gets the same failure translation: without it,
- * each call site would re-implement "was it ok, was there a body, what went
- * wrong" and they would drift apart.
+ * Centralised so every operation gets the same failure translation.
  *
  * @param path - absolute API path, e.g. `/api/tasks`. Relative to the current
  *     origin, so the Vite dev proxy and production deploys share one code path.

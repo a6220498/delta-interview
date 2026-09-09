@@ -7,12 +7,8 @@ import Card from './Card.vue'
 import RowMenu from './RowMenu.vue'
 
 /**
- * The top layer, stood in for.
- *
- * jsdom 30 has no popover support, so the panel the card opens would throw as it
- * mounted. What the panel does with these two methods is `./RowMenu.spec.ts`'s
- * business; what is under test here is the card's half of the wiring — when a
- * panel exists at all, and what the card does with what it reports.
+ * The top layer, stood in for: jsdom 30 has no popover support. Under test here is the
+ * card's half of the wiring; the panel's own is `./RowMenu.spec.ts`'s business.
  */
 const showing = new WeakSet<HTMLElement>()
 
@@ -34,11 +30,8 @@ afterEach(() => {
 enableAutoUnmount(afterEach)
 
 /**
- * Builds a task fixture.
- *
- * The due dates used here are pinned far from any date the suite could
- * plausibly run on — the card reads the real clock to decide "overdue", and a
- * fixture dated near today would start failing on some particular morning.
+ * Builds a task fixture. The due dates are pinned far from any date the suite could
+ * run on, since the card reads the real clock to decide "overdue".
  */
 function task(overrides: Partial<TaskSummary> = {}): TaskSummary {
   return {
@@ -57,10 +50,8 @@ function task(overrides: Partial<TaskSummary> = {}): TaskSummary {
 const LONG_PAST = '2020-01-04'
 
 /**
- * Mounts a card in the document itself, rather than in a detached fragment.
- *
- * The row menu is a popover, and a popover has to be in the page to be shown at
- * all — so every test that opens one mounts through here.
+ * Mounts a card in the document itself. The row menu is a popover, and a popover has
+ * to be in the page to be shown at all.
  */
 function mountAttached(subject: TaskSummary = task()) {
   return mount(Card, { props: { task: subject }, attachTo: document.body })
@@ -101,9 +92,8 @@ describe('Card', () => {
     })
 
     it('labels an overdue task in text, not only in red', () => {
-      // The spec sets this word in CSS `content`, which assistive tech is not
-      // required to announce. Colour plus a decorative glyph would leave the
-      // one state that costs the user something invisible to a screen reader.
+      // The spec sets this word in CSS `content`, which assistive tech need not
+      // announce — leaving the one costly state invisible to a screen reader.
       const wrapper = mount(Card, { props: { task: task({ dueDate: LONG_PAST }) } })
 
       expect(wrapper.text()).toContain('逾期')
@@ -134,9 +124,8 @@ describe('Card', () => {
     })
 
     it('asks for an explicit target state rather than a toggle', async () => {
-      // The contract's completion endpoint takes a boolean on purpose: two fast
-      // clicks must not race to an unpredictable result. The card emits the
-      // state it wants, so the second click asks for the same thing as the first.
+      // The completion endpoint takes a boolean on purpose: the card emits the state
+      // it wants, so two fast clicks ask for the same thing rather than racing.
       const wrapper = mount(Card, { props: { task: task({ completed: false }) } })
 
       await wrapper.get('[aria-pressed]').trigger('click')
@@ -196,9 +185,8 @@ describe('Card', () => {
     })
 
     it('takes the panel away when its own button is pressed again', async () => {
-      // The button is a switch. The browser dismisses the panel on pointerdown,
-      // before the click that would put it straight back up, so the panel says
-      // on its way out that its own button is what took it.
+      // The button is a switch: the browser dismisses on pointerdown, before the click
+      // that would reopen, so the panel says on its way out what took it.
       const wrapper = mountAttached()
       const button = wrapper.get('[aria-haspopup]')
 

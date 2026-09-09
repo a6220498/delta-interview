@@ -14,13 +14,8 @@ import org.springframework.lang.Nullable;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * Implements the task operations declared in {@code api/openapi.yaml}.
- *
- * <p>Carries no {@code @RequestMapping} of its own: every route, status code and
- * validation constraint is inherited from the generated {@link TasksApi}
- * interface, so the contract cannot drift from the running server. The generator
- * runs with {@code skipDefaultInterface=true}, which means removing an operation
- * from this class breaks the build instead of silently serving 501.
+ * Implements the task operations declared in {@code api/openapi.yaml}. No
+ * {@code @RequestMapping} of its own: routes and constraints come from {@link TasksApi}.
  */
 @RestController
 public class TaskController implements TasksApi {
@@ -76,19 +71,8 @@ public class TaskController implements TasksApi {
     }
 
     /**
-     * Narrows a stored task to the fields the board's shelves are drawn from.
-     *
-     * <p>Mapped here rather than in the repository: which fields a response
-     * carries is a contract decision, while the repository's job is to hold
-     * whole tasks — a store that only ever handed back summaries would have
-     * nothing left to answer {@code GET /api/tasks/{id}} with.
-     *
-     * <p>Copied field by field rather than by a mapping library, because there
-     * is exactly one mapping in this application and a library to perform it
-     * would be more machinery than the six lines it replaces. A field the
-     * contract later makes required arrives in the constructor and stops this
-     * line compiling, which is the point at which someone decides whether the
-     * board needs it.
+     * Narrows a stored task to the fields the board's shelves are drawn from. Mapped
+     * here, not in the repository: what a response carries is a contract decision.
      *
      * @param task - the stored task, detail and all.
      * @return the same task without its description.

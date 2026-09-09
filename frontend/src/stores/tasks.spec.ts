@@ -15,13 +15,8 @@ function jsonResponse(status: number, body: unknown): Response {
 const fetchMock = vi.fn<typeof fetch>()
 
 /**
- * Builds one of the rows the list endpoint answers with.
- *
- * `satisfies TaskSummary` rather than a loose object literal: the contract owns
- * this shape, so a field added to `api/openapi.yaml` fails the type check here
- * instead of letting the store be tested against a row the server never sends.
- * It also holds on to the point of this fixture — there is no `description` on
- * it, because the list does not carry one.
+ * Builds one of the rows the list endpoint answers with. `satisfies TaskSummary` so a
+ * field added to `api/openapi.yaml` fails the type check here; note the missing detail.
  */
 function task(overrides: Partial<TaskSummary> = {}): TaskSummary {
   return {
@@ -39,12 +34,8 @@ function task(overrides: Partial<TaskSummary> = {}): TaskSummary {
 }
 
 /**
- * Builds the whole task that `GET /api/tasks/{id}` answers with.
- *
- * The same row plus the one field the shelf never carries. Given a description
- * rather than defaulting it to `null`, because a detail that cannot be told
- * apart from the row it came from would let the assertions below pass against
- * a fetch that never happened.
+ * Builds the whole task `GET /api/tasks/{id}` answers with: the row plus its detail.
+ * Given a description, or the assertions below would pass on a fetch that never ran.
  */
 function detail(overrides: Partial<Task> = {}): Task {
   return {
@@ -70,11 +61,8 @@ function lastBody(): unknown {
 }
 
 /**
- * The four fields the sheet hands up.
- *
- * Typed as both request bodies at once, exactly as the sheet types them: the
- * payload is the same either way, and saying so here means a field added to
- * only one of the two schemas fails this file rather than half the store.
+ * The four fields the sheet hands up, typed as both request bodies at once exactly as
+ * the sheet types them, so a field added to one schema fails here.
  */
 function values(
   overrides: Partial<CreateTaskRequest> = {},
@@ -134,9 +122,8 @@ describe('tasks store', () => {
     })
 
     it('flags loading for exactly as long as the request is in flight', async () => {
-      // The board draws its "still coming" state off this flag; left up after
-      // the answer arrives it would say loading forever, and left down during
-      // the first load the empty shelves would claim there are no tasks.
+      // Left up after the answer arrives it would say loading forever; left down
+      // during the first load, the empty shelves would claim there are no tasks.
       let settle: (response: Response) => void = () => {}
       fetchMock.mockReturnValue(new Promise<Response>((resolve) => { settle = resolve }))
       const store = useTasksStore()
@@ -165,10 +152,8 @@ describe('tasks store', () => {
     })
 
     it('reports a transport failure the same way as a rejected status', async () => {
-      // `fetch` rejects with a TypeError when the backend is not running at
-      // all, which is the most likely failure in development — it has to land
-      // in the same state as a 500 rather than escaping as an unhandled
-      // rejection.
+      // `fetch` rejects with a TypeError when the backend is down, and that has to
+      // land in the same state as a 500 rather than escape as an unhandled rejection.
       fetchMock.mockRejectedValue(new TypeError('Failed to fetch'))
       const store = useTasksStore()
 
@@ -289,9 +274,8 @@ describe('tasks store', () => {
     })
 
     it('files what the server answered rather than what was typed', async () => {
-      // The id and the serial are the server's to assign — that is why the
-      // sheet does not send one — so a row built from the payload would be a
-      // guess at both until the next refresh.
+      // The id and the serial are the server's to assign, so a row built from the
+      // payload would be a guess at both until the next refresh.
       fetchMock.mockResolvedValue(jsonResponse(201, detail({ id: 'server-side', sequence: 9 })))
       const store = useTasksStore()
 
@@ -302,9 +286,8 @@ describe('tasks store', () => {
     })
 
     it('puts the new docket on top, where the list order says it belongs', async () => {
-      // The contract lists tasks newest first, and nothing is newer than one
-      // created a moment ago; filing it anywhere else would move it on the
-      // next refresh.
+      // The contract lists tasks newest first, and nothing is newer than one created
+      // a moment ago; filing it elsewhere would move it on the next refresh.
       const store = useTasksStore()
       fetchMock.mockResolvedValue(jsonResponse(200, [task({ id: 'older' })]))
       await store.fetchTasks()
@@ -316,10 +299,8 @@ describe('tasks store', () => {
     })
 
     it('throws rather than turning a refused save into board state', async () => {
-      // Nothing about the board failed: someone pressed 確定 on a sheet that is
-      // still up, and the reason belongs on that sheet — which the caller holds
-      // and this store does not. In `error` it would raise 工單載不出來 over a
-      // board that loaded perfectly well.
+      // Nothing about the board failed, and the reason belongs on the sheet the caller
+      // holds. In `error` it would raise 工單載不出來 over a board that loaded fine.
       fetchMock.mockResolvedValue(
         jsonResponse(400, { status: 400, title: 'Bad Request', detail: '標題不能空白。' }),
       )
@@ -346,9 +327,8 @@ describe('tasks store', () => {
     })
 
     it('swaps the stored row for the answer, leaving it where it was', async () => {
-      // The response is not always the request: moving a task to the other
-      // category re-issues its serial, and the new number is only in what came
-      // back. The order is `createdAt` descending, which an edit cannot change.
+      // The response is not always the request: re-categorising re-issues the serial,
+      // and only the response carries it. `createdAt` order an edit cannot change.
       const store = useTasksStore()
       fetchMock.mockResolvedValue(jsonResponse(200, [task({ id: 'a' }), task({ id: 'b' })]))
       await store.fetchTasks()

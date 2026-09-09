@@ -26,10 +26,8 @@ function lastUrl(): string {
 }
 
 /**
- * jsdom 30 ships `<dialog>` as an element but almost none of its behaviour, so
- * opening the sheet would throw before a single assertion ran. Stand-ins for
- * the two methods the sheet drives; see `components/TaskDialog/index.spec.ts`,
- * which tests what the sheet does with them.
+ * jsdom 30 ships `<dialog>` with almost none of its behaviour, so stand-ins for the
+ * two methods the sheet drives; `components/TaskDialog/index.spec.ts` tests their use.
  */
 beforeEach(() => {
   // The board loads itself on mount now, so every test needs a server to
@@ -54,11 +52,8 @@ afterEach(() => {
 })
 
 /**
- * Builds one of the rows the board loads; only the fields it reads are varied.
- *
- * A `TaskSummary` and not a `Task`, because that is what `GET /api/tasks`
- * answers with: no `description` on it at all. The board's fixtures say so, so
- * a test cannot lean on detail the shelf never receives.
+ * Builds one of the rows the board loads. A `TaskSummary`, not a `Task`, so no test
+ * can lean on detail the shelf never receives.
  */
 function task(overrides: Partial<TaskSummary> = {}): TaskSummary {
   return {
@@ -80,11 +75,8 @@ function detail(overrides: Partial<Task> = {}): Task {
 }
 
 /**
- * Mounts the whole board on a store of its own.
- *
- * A fresh pinia per mount rather than one shared across the file: Pinia keeps
- * a store instance per pinia, and a list loaded in one test would otherwise
- * still be on the board in the next one.
+ * Mounts the whole board on a store of its own. A fresh pinia per mount, or a list
+ * loaded in one test would still be on the board in the next.
  */
 function mountBoard() {
   return mount(App, { global: { plugins: [createPinia()] } })
@@ -93,12 +85,8 @@ function mountBoard() {
 type Board = ReturnType<typeof mountBoard>
 
 /**
- * The task sheet's own `<dialog>`, and the confirmation's.
- *
- * Asked for through the component rather than with `get('dialog')`: the board
- * mounts two dialogs now, and a bare tag selector takes whichever is written
- * first — these assertions would go on passing while pointing at the other
- * sheet the first time the template is reordered.
+ * The task sheet's own `<dialog>`. Asked for through the component: the board mounts
+ * two, and a bare tag selector would silently follow a template reorder.
  */
 function sheetOf(board: Board) {
   return board.findComponent(TaskDialog).get('dialog')
@@ -110,11 +98,8 @@ function confirmOf(board: Board) {
 }
 
 /**
- * Fills the sheet's one required field and presses 確定 on it.
- *
- * Driven through the sheet's own form rather than through an event, because
- * there is no longer an event: the sheet files what is typed on it, so the only
- * way in from out here is the way a person takes.
+ * Fills the sheet's one required field and presses 確定 on it. Driven through the form,
+ * because the sheet files its own save and there is no event to stand in for it.
  */
 async function submitSheet(board: Board, title = '補上 CORS 設定'): Promise<void> {
   const sheet = board.findComponent(TaskDialog)
@@ -126,9 +111,8 @@ async function submitSheet(board: Board, title = '補上 CORS 設定'): Promise<
 
 describe('App', () => {
   it('mounts the masthead into the layout header landmark rather than the content area', () => {
-    // The wiring is the thing under test: the layout exposes two insertion
-    // points and the masthead has to take the header one, or the page ships
-    // its title inside <main> and the landmark it left behind is empty.
+    // The masthead has to take the header slot, or the page ships its title
+    // inside <main> and the landmark it left behind is empty.
     const wrapper = mountBoard()
 
     expect(wrapper.get('header').text()).toContain('任務管理應用程式')
@@ -136,11 +120,8 @@ describe('App', () => {
   })
 
   it('hangs both racks in the content area, in-tray before out-tray', () => {
-    // The two trays are one component rendered once per row of the rack table,
-    // so the table's order is the order a reader meets the shelves in. Asserted
-    // against the literal ids rather than against `TASK_RACKS` itself: an
-    // expectation read from the same table the loop reads would pass however
-    // the table is rewritten.
+    // The table's order is the order a reader meets the shelves in. Literal ids, not
+    // `TASK_RACKS`: an expectation read from the same table would pass regardless.
     const wrapper = mountBoard()
 
     expect(wrapper.findAllComponents(TaskList).map((tray) => tray.props('rack').id)).toEqual([
@@ -248,10 +229,8 @@ describe('App', () => {
 
   describe('工單彈窗', () => {
     it('keeps the sheet mounted but down until something asks for it', () => {
-      // Mounted, because `<dialog>` returns focus to whatever opened it and can
-      // only do that while it is still in the document; down, because the board
-      // is what the page opens on. One element serves both jobs — it is opened
-      // by name, so there is no second sheet to keep in step with this one.
+      // Mounted, because `<dialog>` returns focus only while still in the document;
+      // down, because the board is what the page opens on.
       const wrapper = mountBoard()
 
       expect(wrapper.findAllComponents(TaskDialog)).toHaveLength(1)
@@ -272,11 +251,8 @@ describe('App', () => {
     })
 
     it('opens an edit sheet on the task whose docket was asked about', async () => {
-      // 編輯 is chosen in the card's own row menu; the tray attaches the row on
-      // the way up, and the board is what turns that into a sheet carrying the
-      // values to correct. Asserted through the sheet's own fields rather than
-      // through a prop, because there is no longer a prop to assert on — the
-      // task is handed over in the call that opens it.
+      // The tray attaches the row on the way up. Asserted through the sheet's own
+      // fields: the task is handed over in the call that opens it, not in a prop.
       const wrapper = mountBoard()
       await flushPromises()
 
@@ -293,10 +269,8 @@ describe('App', () => {
     })
 
     it('fetches the docket before opening it, because the shelf never held its detail', async () => {
-      // The rows come back without a description, so the 說明 field can only be
-      // filled from `GET /api/tasks/{id}`. Without this request the sheet would
-      // open on a blank description and saving it would clear detail the person
-      // was never shown.
+      // Rows come back without a description, so 說明 can only be filled from
+      // `GET /api/tasks/{id}`; without it, saving would clear unseen detail.
       const wrapper = mountBoard()
       await flushPromises()
 
@@ -327,9 +301,7 @@ describe('App', () => {
     })
 
     it('opens the same sheet blank again after an edit', async () => {
-      // The board holds one sheet and moves it between jobs, so 新增工單 pressed
-      // after an edit has to arrive at a blank form rather than at the last task
-      // opened.
+      // One sheet moved between jobs, so 新增工單 after an edit has to arrive blank.
       const wrapper = mountBoard()
       await flushPromises()
 
@@ -344,9 +316,8 @@ describe('App', () => {
     })
 
     it('draws a docket the sheet filed, without loading the board again', async () => {
-      // The seam, and the only part of a save that is the board's: nothing is
-      // bound between the two — the sheet files its own — so what puts the new
-      // docket on the shelf is the store they share.
+      // The only part of a save that is the board's: nothing is bound between the
+      // two, so what puts the new docket on the shelf is the store they share.
       const wrapper = mountBoard()
       await flushPromises()
 
@@ -358,18 +329,16 @@ describe('App', () => {
 
       expect(wrapper.get('main').text()).toContain('新的單子')
       expect(sheetOf(wrapper).attributes('open')).toBeUndefined()
-      // One load on mount and one POST, nothing more: the create response is
-      // the whole task, so refetching the board would be a second round trip to
-      // learn what the request has just returned.
+      // One load and one POST: the create response is the whole task, so refetching
+      // would be a second round trip for what the request just returned.
       expect(fetchMock).toHaveBeenCalledTimes(2)
     })
   })
 
   describe('刪除確認', () => {
     it('keeps the confirmation mounted but down, alongside the sheet', () => {
-      // Two dialogs on the page from the first paint, both waiting to be asked
-      // for: the confirmation is mounted for the same reason the sheet is, so
-      // the browser can hand focus back to whatever raised it.
+      // Both mounted from first paint, so the browser can hand focus back to
+      // whatever raised them.
       const wrapper = mountBoard()
 
       expect(wrapper.findAllComponents(DeleteDialog)).toHaveLength(1)
@@ -378,11 +347,8 @@ describe('App', () => {
     })
 
     it('closes the confirmation when it is answered', async () => {
-      // Raised through the component's own `open()` rather than through the
-      // board, because nothing on the board reaches it yet — see the test
-      // below. What is under test is the other half of the wiring: that an
-      // answered question is taken away by the board rather than by the
-      // confirmation itself.
+      // Raised through `open()` directly, since nothing on the board reaches it yet.
+      // Under test: an answered question is taken away by the board, not by itself.
       const wrapper = mountBoard()
       const confirmation = wrapper.findComponent(DeleteDialog)
 
@@ -397,10 +363,8 @@ describe('App', () => {
     })
 
     it('leaves 刪除 unwired for now, so nothing on the board can raise it', async () => {
-      // Deliberate, and pinned so it is noticed when it changes: the row menu
-      // reports 刪除 as it should, and the board does not listen. The step that
-      // connects the two is the step that has somewhere to delete the task
-      // from.
+      // Deliberate, and pinned so it is noticed when it changes: the row menu reports
+      // 刪除 and the board does not listen. Connecting them needs somewhere to delete.
       const wrapper = mountBoard()
 
       wrapper.findComponent(TaskList).vm.$emit('delete', task())

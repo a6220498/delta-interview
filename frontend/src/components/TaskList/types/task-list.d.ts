@@ -2,45 +2,30 @@ import type { TaskRack } from '@/const/task'
 import type { TaskSummary } from '@/types/task'
 
 /**
- * Inputs for one shelf of the board.
- *
- * The tray takes the tasks it should hold and does no filtering of its own:
- * which tasks belong on which shelf is one decision, and making it twice — once
- * per mounted tray — is how a task ends up on both shelves or on neither.
+ * Inputs for one shelf of the board. The tray does no filtering of its own —
+ * making that decision once per mounted tray is how a task lands on both shelves.
  */
 export interface TaskListProps {
   /**
-   * The shelf this tray is: its name, its tally colour, its empty text and the
-   * completion state it holds.
-   *
-   * The row itself rather than an id to look up, so the tray needs no copy of
-   * the board's table and the two cannot disagree about what a shelf is called.
+   * The shelf this tray is. The row itself rather than an id to look up, so the
+   * tray needs no copy of the board's table.
    */
   rack: TaskRack
   /**
-   * The tasks to stack, already selected for this rack by the caller.
-   *
-   * Rows rather than whole tasks: the list endpoint answers without
-   * `description`, so a card cannot draw detail that never arrived — and the
-   * type is what says so.
+   * The tasks to stack, already selected for this rack by the caller. Rows, not
+   * whole tasks: the list endpoint answers without `description`.
    */
   tasks: TaskSummary[]
   /**
-   * Whether the board is still fetching.
-   *
-   * An empty shelf and a shelf that has not arrived are the same `tasks`, and
-   * only the caller knows which of the two it is handing over. Without this the
-   * tray would point someone at 新增工單 while their tasks were still in flight.
+   * Whether the board is still fetching. An empty shelf and a shelf that has not
+   * arrived are the same `tasks`, and only the caller knows which it is handing over.
    */
   loading?: boolean
 }
 
 /**
- * What the shelf reports: its cards' events, each with the task it came from.
- *
- * The task is attached here because the list is the last place that knows which
- * card is which; making the screen above work that out from the event's source
- * would tie it to this component's internals.
+ * What the shelf reports: its cards' events, each with the task it came from. The
+ * list is the last place that knows which card is which.
  */
 export interface TaskListEmits {
   /** A card asked to change completion state, carrying the task it belongs to. */

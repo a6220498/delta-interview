@@ -1,25 +1,7 @@
 <script setup lang="ts">
 /**
- * The row menu: 編輯 and 刪除 on a small sheet, hanging under one docket's
- * three-dot button.
- *
- * The card renders this only while the menu is up, so a board of thirty dockets
- * carries no thirty hidden panels — and the component's existence *is* the menu
- * being open. That is why there is nothing here to call: it takes the docket and
- * the button it hangs from as props, puts itself up as it mounts, and reports
- * `close` on every way it can go back down. The card holds the one fact, this
- * holds the behaviour, and there is no second copy of "is the menu open" to
- * disagree with the first.
- *
- * A native `popover`, which the spec picks for four things that would otherwise
- * be hand-built: it opens in the top layer, so neither the tray's box nor the
- * next docket can clip or cover it; a press outside dismisses it; Esc dismisses
- * it; and closing hands focus back to the three-dot button.
- *
- * Placed by measuring rather than by CSS anchor positioning, which Safari does
- * not have: the button's box and the panel's own are read back once the panel is
- * up, and it goes below the button unless it would fall off the bottom of the
- * window, in which case it flips above it.
+ * The row menu, hanging under one docket's three-dot button: rendered only while it
+ * is up, a native `popover`, placed by measuring since Safari has no anchor positioning.
  */
 import { computed, onBeforeUnmount, onMounted, useTemplateRef } from 'vue'
 
@@ -38,12 +20,8 @@ const rowMenuEl = useTemplateRef<HTMLElement>('rowMenuEl')
 const number = computed(() => displayNumber(props.task))
 
 /**
- * Whether the panel is up, as far as this component is concerned.
- *
- * Plain `let` rather than a ref: nothing on the page is drawn from it. It exists
- * so the panel is neither hidden twice nor reported closed twice — hiding a
- * popover comes back as a `toggle` event, which is the same news arriving a
- * second time.
+ * Whether the panel is up, as far as this component is concerned. Guards against
+ * reporting closed twice: hiding a popover comes back as a `toggle` event.
  */
 let shown = false
 
@@ -51,15 +29,8 @@ let shown = false
 let openedAtScrollY = 0
 
 /**
- * Takes the panel away, and reports it — once, whatever else asks afterwards.
- *
- * Reported before it is hidden rather than after: `hidePopover()` comes back as
- * a `toggle` event, and the order the two arrive in is the browser's business.
- * Saying it first means the answer below cannot be overwritten by that echo.
- *
- * `hidePopover()` at all, rather than leaving the card to unmount the element:
- * hiding a popover is what hands focus back to the three-dot button, and an
- * element taken out of the page while still showing takes the focus with it.
+ * Takes the panel away and reports it once. Reported before hiding, since the echo
+ * arrives as a `toggle`; hidden rather than unmounted, which is what restores focus.
  *
  * @param byAnchor - Whether a press on the three-dot button is what took it.
  */
@@ -73,23 +44,11 @@ function dismiss(byAnchor: boolean): void {
   rowMenuEl.value?.hidePopover()
 }
 
-// [AI assisted 006] 這段的時序是踩出來的。三點鈕要能「再按一次關掉」，而 popover 的
-// light dismiss 在 click 之前就把面板收掉了。前一版（板子共用的面板）先用「比對單號」，
-// 會讓滑鼠按過面板裡的編輯之後、再用鍵盤 Enter 同一張卡的第一次被吃掉；改成
-// `anchor.contains(按下去的東西)` 又恆真，按別張卡變成關閉。搬進卡片後索性不再依賴
-// popover 的 toggle 事件 —— 它是排進 task queue 非同步派送的，而「會不會趕在 click
-// 前面」在 jsdom 裡驗不到，所以改在 pointerdown 當下同步收掉並回報。
+// [AI assisted 006] 這段時序是踩出來的：popover 的 toggle 事件是非同步派送的，趕不趕得上
+// click 在 jsdom 裡驗不到，所以改在 pointerdown 當下同步收掉並回報。
 /**
- * A press on the three-dot button, which closes the panel rather than reopening
- * it.
- *
- * Handled here, at `pointerdown`, rather than left to the browser's own light
- * dismiss: that dismissal is reported through the popover's `toggle` event,
- * which is dispatched from a queued task, and the card needs the answer before
- * the `click` this same press is about to produce. Taking the panel away here
- * is synchronous, so the order is not something to hope for.
- *
- * Every other press outside the panel is left to the browser — see `onToggle`.
+ * A press on the three-dot button, which closes the panel rather than reopening it.
+ * Handled at `pointerdown` so the card has the answer before the `click` arrives.
  */
 function onPointerDown(event: Event): void {
   if (!(event.target instanceof Node) || !props.anchor.contains(event.target)) {
@@ -100,10 +59,8 @@ function onPointerDown(event: Event): void {
 }
 
 /**
- * The browser took the panel away: a press elsewhere on the page, or Esc.
- *
- * Cast because `ontoggle` is declared as taking a plain `Event` — `ToggleEvent`
- * is what is actually dispatched, and `newState` is the only field read.
+ * The browser took the panel away: a press elsewhere on the page, or Esc. Cast
+ * because `ontoggle` is declared as taking a plain `Event`.
  */
 function onToggle(event: Event): void {
   if ((event as ToggleEvent).newState === 'closed') {
@@ -124,9 +81,8 @@ function choose(entry: 'edit' | 'delete'): void {
 }
 
 /**
- * The panel is fixed to the viewport, so it has to go once the card it points at
- * has moved. Compared against the position recorded when it opened rather than
- * against "a scroll event arrived" — see `SCROLL_SLACK`.
+ * The panel is fixed to the viewport, so it goes once the card it points at has moved.
+ * Compared against the position recorded when it opened — see `SCROLL_SLACK`.
  */
 function onScroll(): void {
   if (Math.abs(window.scrollY - openedAtScrollY) < SCROLL_SLACK) {
@@ -142,12 +98,8 @@ function onResize(): void {
 }
 
 /**
- * Puts the panel below the three-dot button, or above it if it would not fit.
- *
- * Both boxes are read after the panel is up, because a popover is `display:
- * none` until then and would measure zero. The horizontal edge is the button's
- * right one — the panel hangs back into the card rather than off the side of it
- * — clamped so that neither edge of the window can cut it off.
+ * Puts the panel below the three-dot button, or above it if it would not fit. Both
+ * boxes are read after it is up, since a popover is `display: none` until then.
  *
  * @param element - The panel, already showing.
  */
@@ -171,9 +123,8 @@ function place(element: HTMLElement): void {
 }
 
 onMounted(() => {
-  // Capturing, so the press is seen before the browser's light dismiss acts on
-  // it. On the document rather than on the button: every press has to be
-  // classified, not only the ones that land on this card.
+  // Capturing, so the press is seen before the browser's light dismiss acts on it.
+  // On the document: every press has to be classified, not only this card's.
   document.addEventListener('pointerdown', onPointerDown, true)
   window.addEventListener('scroll', onScroll)
   window.addEventListener('resize', onResize)
@@ -184,9 +135,8 @@ onMounted(() => {
     return
   }
 
-  // No `nextTick`: the panel is mounted with its number already rendered, and
-  // `showPopover()` puts it in the top layer synchronously, so the boxes
-  // measured on the next line are the ones that will be painted.
+  // No `nextTick`: `showPopover()` puts the panel in the top layer synchronously,
+  // so the boxes measured on the next line are the ones that will be painted.
   element.showPopover()
   shown = true
   place(element)
@@ -202,19 +152,12 @@ onBeforeUnmount(() => {
 
 <template>
   <!--
-    [AI assisted 006] 這裡曾經寫成 `popover-open:grid`，型別檢查、lint、單元測試全過，
-    但 Tailwind 沒有這個 variant，兩條 class 會被靜默丟掉、build 也不報錯，面板開起來
-    沒有排版。是去翻 build 產出的 CSS 才抓到的。
+    [AI assisted 006] 曾經寫成 `popover-open:grid`：Tailwind 沒這個 variant，class 被
+    靜默丟掉、build 不報錯，面板開起來沒排版。是翻 build 產出的 CSS 才抓到的。
   -->
   <!--
-    `open:` rather than `popover-open:` — Tailwind has no variant under the
-    second name and drops the two utilities silently, leaving the panel
-    unstyled with no build error. `open:` compiles to
-    `:is([open], :popover-open, :open)`, which is forgiving, so a browser
-    without `:popover-open` still matches on the rest.
-
-    inset-auto and m-0 undo what the UA sheet gives a popover — it is centred
-    by default, and the panel is positioned by hand.
+    `open:` compiles to `:is([open], :popover-open, :open)`, forgiving of browsers
+    without `:popover-open`. inset-auto and m-0 undo the UA sheet's centring.
   -->
   <div
     ref="rowMenuEl"
@@ -224,9 +167,8 @@ onBeforeUnmount(() => {
     @toggle="onToggle"
   >
     <!--
-      The panel opens in the top layer, away from the card it belongs to, so it
-      prints the number it is about. Not `aria-hidden`: someone who cannot see
-      which docket the panel is hanging over needs it more than anyone.
+      The panel opens away from its card, so it prints the number it is about. Not
+      `aria-hidden`: whoever cannot see which docket it hangs over needs it most.
     -->
     <div
       data-number
@@ -236,10 +178,8 @@ onBeforeUnmount(() => {
     </div>
 
     <!--
-      `autofocus` rather than a `focus()` of our own: naming the entry inside the
-      browser's own popover-showing steps is what leaves it able to hand focus
-      back to the three-dot button afterwards. 44px rows, as everywhere else a
-      finger has to land.
+      `autofocus` rather than our own `focus()`: naming it inside the browser's
+      popover-showing steps is what lets it hand focus back to the button after.
     -->
     <button
       type="button"

@@ -1,26 +1,7 @@
 <script setup lang="ts">
 /**
- * The sheet: one blank docket, filled in either to open a new job or to correct
- * a filed one.
- *
- * Deliberately one component for both, as the spec has it. The two differ in
- * four words — the number in the corner and the heading beside it — while the
- * fields, their limits, their validation and the 取消／確定 pair are identical;
- * a second component would be a copy of this one that drifts the first time a
- * field is added to only one of them. `open()` carries the difference, and in
- * edit mode the task it is handed carries the values the fields open with.
- *
- * A native `<dialog>` opened with `showModal()`, not a floating div: focus stays
- * inside the sheet, Esc closes it, and focus returns to the control that opened
- * it — all things the browser already does correctly and a hand-built modal has
- * to earn back one keyboard interaction at a time.
- *
- * Opened and closed by calling it rather than by a prop, because the browser
- * closes it too and a fact with two owners goes out of step: see
- * `TaskDialogExposed` in `./types`. What is typed on it is filed from here as
- * well: the sheet is the only thing that knows which docket it is on, so
- * whether a save is a `POST` or a `PUT` is its own question to answer — and a
- * refused one is reported on the paper the typing is still sitting on.
+ * The sheet: one blank docket, filled in to open a new job or correct a filed one.
+ * One component for both, a native `<dialog>`, opened by calling it rather than by a prop.
  */
 import { computed, nextTick, ref, shallowRef, useId, useTemplateRef } from 'vue'
 
@@ -44,32 +25,19 @@ import type {
   TaskDialogValues,
 } from './types'
 
-// [AI assisted 006] 這個元件一個 prop 都沒有，是使用者要求改用 defineExpose 的
-// open / close 之後的連帶決定：原本的 `open` 布林 prop 會變成第二個「彈窗開著沒有」的
-// 主人，而瀏覽器自己就會關 dialog（Esc、backdrop），父層那份遲早跟元素本身不同步。
-// 唯一事實來源改成 <dialog> 的 open 屬性，showModal() 前也因此要擋一次 —— 對已開啟的
-// dialog 呼叫會丟 InvalidStateError，而「開著時換成另一張單」是合理操作。
+// [AI assisted 006] 這個元件一個 prop 都沒有：`open` 布林 prop 會變成第二個「彈窗開著
+// 沒有」的主人，而瀏覽器自己就會關 dialog，遲早不同步。唯一事實來源是 <dialog>.open。
 const emit = defineEmits<TaskDialogEmits>()
 
 /**
- * The tasks, and the two requests that file one.
- *
- * The store rather than an event handed up to the board: the sheet is the only
- * thing that knows which docket it is on, so a board that saved on its behalf
- * would have to keep a second copy of that to address the request with — and
- * two owners of one fact are how a correction ends up filed as a new task.
- * Nothing about the save needs the board either, since what comes back lands on
- * the shelves through the same store the board draws from.
+ * The tasks, and the two requests that file one. The store rather than an event to
+ * the board: only the sheet knows which docket it is on.
  */
 const tasksStore = useTasksStore()
 
 /**
- * Prefix for this sheet's element ids.
- *
- * Generated rather than written out, because every `for` / `aria-describedby`
- * pair below is an id: two sheets mounted at once with hard-coded ids would
- * give one label two inputs to point at, and a label that points at the wrong
- * field is worse than no label at all.
+ * Prefix for this sheet's element ids. Generated, so two sheets mounted at once
+ * cannot give one label two inputs to point at.
  */
 const uid = useId()
 
@@ -80,12 +48,8 @@ const titleInput = useTemplateRef<HTMLInputElement>('titleInput')
 const mode = ref<TaskDialogMode>('create')
 
 /**
- * The task the sheet was opened on, or `null` while it is a blank one.
- *
- * `shallowRef` because the sheet holds a task, it does not own one: it takes
- * the values out once, as it opens, and never writes a field back through it —
- * and a deep ref would make the board's task into a reactive copy of itself the
- * moment it was handed over.
+ * The task the sheet was opened on, or `null` while it is a blank one. `shallowRef`:
+ * the values come out once, as it opens, and no field is ever written back.
  */
 const source = shallowRef<Task | null>(null)
 
@@ -96,13 +60,8 @@ const dueDate = ref('')
 const titleError = ref('')
 
 /**
- * Why the last save came back refused, or empty while none has.
- *
- * Held here rather than in the store's `error`, which is the board's: that one
- * raises 工單載不出來 above the shelves with a 重試 beside it that reloads the
- * list and would not resend this save — behind a modal that hides it either
- * way. The reason belongs where the person who pressed 確定 is looking, which
- * is the fields they typed.
+ * Why the last save came back refused, or empty while none has. Not the store's
+ * `error`, which is the board's and sits behind this modal anyway.
  */
 const submitError = ref('')
 
@@ -112,10 +71,8 @@ const heading = computed(() => HEADINGS[mode.value])
 const number = computed(() => (source.value ? displayNumber(source.value) : NEW_NUMBER))
 
 /**
- * The select's options, each drawn as `bug — 修復`.
- *
- * The prefix is taken from the same lookup that numbers a card rather than
- * written beside the gloss, so the two cannot come to disagree.
+ * The select's options, each drawn as `bug — 修復`. The prefix comes from the same
+ * lookup that numbers a card, so the two cannot come to disagree.
  */
 const categories = computed(() =>
   CATEGORY_OPTIONS.map((option) => ({
@@ -125,11 +82,8 @@ const categories = computed(() =>
 )
 
 /**
- * Fills the fields from the task the sheet is opening on, or empties them.
- *
- * `??` rather than `||` on the two optional fields: the contract sends `null`
- * for "not set", and both have to land in the DOM as an empty string — a `null`
- * assigned to an input's value renders the four characters `null`.
+ * Fills the fields from the task the sheet is opening on, or empties them. `??` not
+ * `||`: the contract's `null` must land in the DOM as an empty string.
  */
 function seed(): void {
   const task = source.value
@@ -143,11 +97,8 @@ function seed(): void {
 }
 
 /**
- * Puts the sheet on the desk, on a task or on nothing.
- *
- * The values are read here, as the sheet opens, and not again: the owner
- * updates the task it holds as soon as a save lands, and re-reading on that
- * would wipe out whatever had been typed since.
+ * Puts the sheet on the desk, on a task or on nothing. The values are read here and
+ * not again, so a save landing elsewhere cannot wipe out what has been typed since.
  *
  * @param nextMode - Which job the sheet is opening for.
  * @param task - The task to correct; only ever passed in edit mode, which the
@@ -170,11 +121,8 @@ const open: TaskDialogOpen = (nextMode: TaskDialogMode, task?: Task): void => {
     element.showModal()
   }
 
-  // Deferred to after the fields have been written. The spec's own behaviour is
-  // that the caret starts in 標題 with the old title selected, so it can be
-  // replaced by typing over it — and run now, `select()` would take the title
-  // the box held a render ago, or nothing at all on a sheet opening for the
-  // first time.
+  // Deferred until the fields are written: the caret starts in 標題 with the old
+  // title selected, and run now `select()` would take the box's previous contents.
   void nextTick(() => {
     titleInput.value?.focus()
     titleInput.value?.select()
@@ -193,46 +141,23 @@ function close(): void {
 defineExpose<TaskDialogExposed>({ open, close })
 
 /**
- * Whether a save is on the wire.
- *
- * A plain `let` rather than a ref, because nothing on the sheet draws it —
- * one small request, and a spinner that appears and vanishes within a frame is
- * worse than none.
+ * Whether a save is on the wire. A plain `let`: nothing draws it, and a spinner
+ * that appears and vanishes within a frame is worse than none.
  */
 let saving = false
 
 /**
- * Validates the one required field, then files what is on the sheet.
- *
- * The title is checked here rather than left to `required`, so the message
- * lands in the row kept for it under the field instead of in a browser bubble
- * that is styled by no one, disappears on its own and is not reliably announced.
- *
- * Which request it becomes comes from the task the sheet was opened on and not
- * from the values, which are the same four fields either way: a docket in hand
- * is a correction, nothing in hand is a new one. Neither an `id` nor a
- * `sequence` is minted here — both are the server's, so that no two clients can
- * issue the same number — and what goes on the shelves is what came back.
- *
- * An empty description or date is sent as `null`, not as `''`: both requests
- * replace the whole task, so an empty string would file a task whose deadline
- * is the empty string rather than one with no deadline.
- *
- * The sheet comes down only once the save has landed. A refusal leaves it up
- * with the typing still in it and the reason printed above the buttons: 400s
- * are exactly what this form can produce, and a sheet that had already closed
- * would have thrown away both.
+ * Validates the one required field, then files what is on the sheet — a `PUT` when it
+ * was opened on a docket, a `POST` otherwise. It comes down only once the save lands.
  */
 async function onSubmit(): Promise<void> {
-  // A guard rather than a disabled button: 確定 pressed twice on a slow
-  // connection would file the same docket twice, and the copy can only be taken
-  // back by deleting it.
+  // A guard rather than a disabled button: 確定 pressed twice on a slow connection
+  // would file the same docket twice, and the copy can only be taken back by deleting it.
   if (saving) {
     return
   }
 
-  // Cleared before anything else: what is on the paper is about the previous
-  // attempt, and this is a new one whether or not it gets as far as the wire.
+  // Cleared first: what is on the paper is about the previous attempt.
   submitError.value = ''
 
   const trimmed = title.value.trim()
@@ -276,11 +201,8 @@ async function onSubmit(): Promise<void> {
 
 <template>
   <!--
-    m-auto is not decoration: Tailwind's preflight zeroes every margin, which
-    takes with it the `margin: auto` the browser centres a modal dialog with.
-
-    p-0 for the same reason in reverse — the UA gives a dialog its own padding,
-    and the head and the form each carry their own.
+    m-auto restores the centring preflight zeroes; p-0 drops the UA's own padding,
+    since the head and the form each carry theirs.
   -->
   <dialog
     ref="taskDialogEl"
@@ -324,9 +246,8 @@ async function onSubmit(): Promise<void> {
           class="font-mono text-[12.5px] font-bold tracking-[0.12em] text-ink-2 uppercase"
         >
           標題<!--
-            The star is a mark for people who can see the form; `required` on the
-            input is what carries the meaning, so a reader hears "必填" rather
-            than a lone "asterisk".
+            The star is for people who can see the form; `required` on the input
+            carries the meaning, so a reader hears "必填", not "asterisk".
           --><span
             aria-hidden="true"
             class="ml-[3px] text-[14px] text-alert"
@@ -334,16 +255,8 @@ async function onSubmit(): Promise<void> {
         </label>
 
         <!--
-          A field is a line to write on, not a rounded box. The whole line turns
-          red when validation fails — a red message beside a black line reads as
-          a note about the form rather than about this field.
-
-          The focus treatment is bound alongside it — both the line and the
-          weight under it — rather than left as a standing purple, which would
-          win over the red the moment the field took focus. Failing validation
-          puts the caret right here, so that is exactly when the red would go;
-          and a red line over a purple underline reads as one two-tone line
-          rather than as a field in one state.
+          A line to write on, not a rounded box; the whole line reddens on failure.
+          Focus is bound alongside it, so a standing purple cannot win over the red.
         -->
         <input
           :id="`${uid}-title`"
@@ -365,10 +278,8 @@ async function onSubmit(): Promise<void> {
         >
 
         <!--
-          The row is empty most of the time but never collapses: it holds its
-          height so a message appearing does not push the rest of the form down
-          and take the reader's place on it with it. aria-live announces the
-          message without interrupting someone who is still typing.
+          Holds its height while empty, so a message appearing cannot push the form
+          down. aria-live announces it without interrupting someone still typing.
         -->
         <span
           :id="`${uid}-title-msg`"
@@ -395,9 +306,8 @@ async function onSubmit(): Promise<void> {
         </label>
 
         <!--
-          appearance-none takes the native arrow away along with the box, so the
-          wrapper draws one back — without it this field is indistinguishable
-          from the single-line input above it.
+          appearance-none takes the native arrow away with the box, so the wrapper
+          draws one back; without it this reads as the input above.
         -->
         <span
           class="relative block after:pointer-events-none after:absolute after:top-[44%] after:right-[5px] after:size-[7px] after:-translate-y-1/2 after:rotate-45 after:border-r-[1.5px] after:border-b-[1.5px] after:border-ink-2 after:content-['']"
@@ -438,11 +348,8 @@ async function onSubmit(): Promise<void> {
         </label>
 
         <!--
-          Ruled paper rather than a single line: the shape of the field is what
-          says this one may run long, so the form does not have to say it in
-          words. The rules are a repeating gradient on the line height, and
-          background-attachment:local scrolls them with the text — fixed, the
-          words would come off the lines on the second screenful.
+          Ruled paper rather than a single line, so the shape says this one may run
+          long. background-attachment:local scrolls the rules with the text.
         -->
         <textarea
           :id="`${uid}-description`"
@@ -488,18 +395,8 @@ async function onSubmit(): Promise<void> {
       </div>
 
       <!--
-        A refused save says so here rather than on the board. The sheet is
-        modal, so the store's own notice is behind it — and the reader is
-        looking at the fields they typed, which is where the reason belongs.
-
-        role="alert" because nothing was asked of the reader: 確定 was pressed
-        and the answer came back a refusal.
-
-        The one row on this sheet that does not hold its height while empty.
-        The four above it must, because a message appearing between fields
-        pushes the rest of the form out from under the reader; nothing sits
-        below this one but the buttons, and reserving a notice's worth of blank
-        paper on every sheet to spare them a shift is the worse trade.
+        A refused save says so here, not on the board behind this modal. The one row
+        that does not hold its height while empty: only the buttons sit below it.
       -->
       <p
         v-if="submitError"
@@ -515,10 +412,7 @@ async function onSubmit(): Promise<void> {
         <span class="text-[12.5px] text-ink-2">{{ submitError }}</span>
       </p>
 
-      <!--
-        The same 取消／確定 pair in both modes: what the sheet is doing is said
-        once, in the heading, rather than repeated on the button.
-      -->
+      <!-- The same 取消／確定 pair in both modes: the heading already says which job. -->
       <div class="flex justify-end gap-[9px]">
         <button
           type="button"

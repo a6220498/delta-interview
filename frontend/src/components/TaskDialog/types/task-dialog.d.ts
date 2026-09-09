@@ -1,27 +1,14 @@
 import type { CreateTaskRequest, Task, TaskCategory, UpdateTaskRequest } from '@/types/task'
 
 /**
- * Which of the two jobs the sheet is doing.
- *
- * Named states rather than an `isEdit` boolean: a boolean names one mode and
- * leaves the other as "not that one", which reads backwards at the call site
- * (`open(false)` to open a blank sheet) and has nowhere to grow if a third mode
- * ever appears.
+ * Which of the two jobs the sheet is doing. Named states rather than an `isEdit`
+ * boolean, which reads backwards at the call site and cannot grow a third mode.
  */
 export type TaskDialogMode = 'create' | 'edit'
 
 /**
- * Putting the sheet on the desk.
- *
- * Two signatures rather than one with an optional task, so a mode and the task
- * it needs travel together: `open('edit', …)` cannot be called without one, and
- * `open('create')` cannot be handed one. That pairing is the whole reason this
- * is typed as an overload — checked where the sheet is opened, it costs the
- * sheet no runtime guard and cannot be got wrong at all.
- *
- * Calling it on a sheet that is already open is legitimate: it re-reads the
- * fields from what it is handed, so the same sheet can be moved onto another
- * task without being closed first.
+ * Putting the sheet on the desk. Two signatures so a mode and the task it needs
+ * travel together; calling it on an open sheet re-reads the fields.
  */
 export interface TaskDialogOpen {
   /** Opens a blank sheet. There is no task yet, so there is nothing to carry in. */
@@ -36,33 +23,18 @@ export interface TaskDialogOpen {
 }
 
 /**
- * What the sheet hands to whoever holds it.
- *
- * The sheet owns whether it is open, and this is how that is asked for. It is
- * deliberately not a `v-model:open` or an `open` prop: a dialog opened by a
- * prop and closed by the browser — Esc, the backdrop — has two owners for one
- * fact, and they go out of step the first time the browser wins. Here the
- * question "is the sheet up?" has exactly one answer, and it is the `<dialog>`
- * element's own.
+ * What the sheet hands to whoever holds it. Not a `v-model:open` or an `open`
+ * prop: the `<dialog>` element owns whether it is up, so the fact has one owner.
  */
 export interface TaskDialogExposed {
   open: TaskDialogOpen
-  /**
-   * Takes the sheet away.
-   *
-   * A no-op on a sheet that is already down, so the owner can call it after a
-   * save without first checking what the person did while it was in flight.
-   */
+  /** Takes the sheet away; a no-op on a sheet that is already down. */
   close: () => void
 }
 
 /**
- * The four fields, as they go onto the wire.
- *
- * Typed as both request bodies at once rather than as a shape of its own: the
- * four fields are the same either way — which is why one sheet does both jobs —
- * and stating it against the contract means a field added to `POST` or `PUT`
- * breaks this component instead of being quietly left out of the request.
+ * The four fields, as they go onto the wire. Typed as both request bodies at once
+ * so a field added to `POST` or `PUT` breaks this component instead of being dropped.
  */
 export type TaskDialogValues = CreateTaskRequest & UpdateTaskRequest
 
@@ -75,21 +47,13 @@ export interface CategoryOption {
 }
 
 /**
- * What the sheet reports.
- *
- * One event, and it asks nothing of anyone. There is no `submit` beside it
- * because a save is not something the sheet needs done for it: it files what
- * was typed itself, and a form that reported its values as well would be
- * offering a second, unfiled copy of them.
+ * What the sheet reports. One event, asking nothing of anyone: the sheet files
+ * what was typed itself, so there is no `submit` beside it.
  */
 export interface TaskDialogEmits {
   /**
-   * The sheet went down: 取消, Esc, `close()`, or a save that landed.
-   *
-   * Reported for whoever wants to know, not asked of anyone — the sheet is
-   * already closed by the time this fires, so nothing has to act on it. Every
-   * dismissal comes out here, including the sheet's own, because the
-   * alternative is a hidden flag deciding which closes are worth mentioning.
+   * The sheet went down: 取消, Esc, `close()`, or a save that landed. Reported
+   * for whoever wants to know — the sheet is already closed when this fires.
    */
   close: []
 }

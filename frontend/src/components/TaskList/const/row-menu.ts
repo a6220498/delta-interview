@@ -7,11 +7,7 @@ export const PLACEMENT = {
 } as const
 
 /**
- * How far the page may scroll before an open panel is taken away, in pixels.
- *
- * A distance rather than a plain "a scroll event arrived": the panel is fixed
- * to the viewport, so it has to go once the card underneath it has moved, but a
- * scroll event already queued when the panel opens would otherwise close it in
- * the same breath as opening it.
+ * How far the page may scroll before an open panel is taken away, in pixels. A
+ * distance, not a bare scroll event, which could arrive in the breath after opening.
  */
 export const SCROLL_SLACK = 2

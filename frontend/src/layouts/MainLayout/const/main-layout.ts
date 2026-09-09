@@ -1,8 +1,6 @@
 /**
  * What the frame titles and labels itself with when the caller says nothing.
- *
- * `withDefaults` type-checks this against `MainLayoutProps`, so a prop renamed
- * in `../types` fails here rather than silently losing its default.
+ * `withDefaults` type-checks it, so a renamed prop fails here instead of silently.
  */
 export const MAIN_LAYOUT_DEFAULTS = {
   heading: '看板 / Board',

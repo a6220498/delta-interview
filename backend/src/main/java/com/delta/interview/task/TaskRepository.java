@@ -15,17 +15,8 @@ import java.util.concurrent.atomic.AtomicInteger;
 import org.springframework.stereotype.Repository;
 
 /**
- * In-memory store for tasks, backing the scaffold until a real datastore lands.
- *
- * <p>Stores the generated {@link Task} model directly instead of a separate
- * domain entity plus mapper. With no persistence layer there is nothing for a
- * second representation to decouple us from, and an unused mapping layer is the
- * kind of speculative abstraction the project rules forbid. The moment a real
- * datastore arrives, introduce a persistence entity here and map at this
- * boundary — the controller and the contract stay untouched.
- *
- * <p>Backed by a {@link ConcurrentHashMap} because Spring serves requests from a
- * thread pool; a plain {@code HashMap} would corrupt under concurrent writes.
+ * In-memory store for tasks, holding the generated {@link Task} model directly since
+ * there is no persistence layer yet. {@link ConcurrentHashMap}: Spring uses a pool.
  */
 @Repository
 public class TaskRepository {
@@ -73,11 +64,8 @@ public class TaskRepository {
     }
 
     /**
-     * Stores a new task with a server-assigned id, serial and timestamps.
-     *
-     * <p>The id, serial and timestamps are assigned here rather than accepted
-     * from the request: a client-chosen id could overwrite an existing task, and
-     * a client-chosen serial could duplicate a number already on someone's screen.
+     * Stores a new task with a server-assigned id, serial and timestamps. Assigned here
+     * rather than accepted: a client-chosen id or serial could collide with a stored one.
      *
      * @param title - the task title, already validated by the contract.
      * @param description - optional detail; may be {@code null}.
@@ -95,13 +83,8 @@ public class TaskRepository {
     }
 
     /**
-     * Replaces a task's editable fields, leaving its completion state alone.
-     *
-     * <p>Moving a task to the other category re-issues its serial from the
-     * destination's counter, because the two counters run independently and a
-     * carried-over serial could collide with a number already in use there. The
-     * task's {@code id} is untouched, so the move costs nothing that a URL or an
-     * in-flight request depends on. The vacated serial is simply burned.
+     * Replaces a task's editable fields, leaving completion alone. A move to the other
+     * category re-issues the serial, since the counters run independently.
      *
      * @param id - the task to update.
      * @param title - the replacement title.
@@ -113,10 +96,8 @@ public class TaskRepository {
      */
     public Task update(UUID id, String title, String description, TaskCategory category, LocalDate dueDate) {
         return mutate(id, task -> {
-            // [AI assisted 003] 由 AI 協助把「該不該重新發號」的判斷放進
-            // computeIfPresent 的原子區段內，避免讀舊類別與寫新號碼之間出現空隙。
-            // Read before the field is overwritten: whether this is a move is the
-            // only thing that decides between keeping and re-issuing the serial.
+            // [AI assisted 003] 「該不該重新發號」的判斷放進 computeIfPresent 的原子區段
+            // 內，避免讀舊類別與寫新號碼之間出現空隙。必須在欄位被覆寫前先讀。
             int sequence = category == task.getCategory() ? task.getSequence() : nextSequence(category);
             return task.title(title)
                     .description(description)
@@ -180,16 +161,8 @@ public class TaskRepository {
     }
 
     /**
-     * Builds one independent counter per category, all starting at zero.
-     *
-     * <p>The contract makes the pair (category, serial) unique rather than the
-     * serial alone, so each category needs its own counter — sharing one would
-     * leave visible gaps in both numbering runs.
-     *
-     * <p>Filled in completely here and never structurally modified afterwards,
-     * so the unsynchronised {@link EnumMap} is only ever read concurrently while
-     * the counting itself happens inside {@link AtomicInteger}. Adding a
-     * category later means adding an enum constant; this picks it up for free.
+     * Builds one independent counter per category: the contract makes (category, serial)
+     * unique, and the {@link EnumMap} is filled here then only ever read.
      *
      * @return a counter for every declared category.
      */

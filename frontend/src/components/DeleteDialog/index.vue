@@ -1,24 +1,7 @@
 <script setup lang="ts">
 /**
- * The delete confirmation: the same sheet of paper as `TaskDialog`, with the
- * rule across its top in red and one question on it.
- *
- * Deleting sits next to editing in the row menu, the two are one keystroke
- * apart and only one of them can be undone — which is the whole reason this
- * step exists. So the paper copies out the docket's number *and* its title:
- * what is being confirmed is this one particular sheet, not a nameless "這個
- * 項目" that a person has to trust they were pointing at.
- *
- * A native `<dialog>` opened with `showModal()`, for the reasons `TaskDialog`
- * gives — focus trap, Esc, focus handed back to the control that opened it.
- * Two things here that the sheet next door does not need:
- *
- * - `role="alertdialog"`, with the warning line as the dialog's description, so
- *   the consequence is read out on opening rather than only sitting there.
- * - Focus lands on 取消. A destructive action may not be what a stray Enter
- *   hits, and Esc — which is to say, giving no answer at all — means no.
- *
- * The sheet decides nothing: it reports 確定 and waits. See `./types`.
+ * The delete confirmation: `TaskDialog`'s sheet with a red top rule and one question.
+ * `role="alertdialog"`, focus on 取消, and it decides nothing — it reports and waits.
  */
 import { computed, nextTick, shallowRef, useId, useTemplateRef } from 'vue'
 import { displayNumber } from '@/utils/task'
@@ -31,11 +14,8 @@ import type { DeleteDialogEmits, DeleteDialogExposed } from './types'
 const emit = defineEmits<DeleteDialogEmits>()
 
 /**
- * Prefix for this sheet's element ids.
- *
- * Generated rather than written out: `aria-labelledby` and `aria-describedby`
- * are both ids, and two confirmations mounted at once with hard-coded ids would
- * have one of them describing the other one's warning.
+ * Prefix for this sheet's element ids. Generated, so two confirmations mounted at
+ * once cannot have one describing the other one's warning.
  */
 const uid = useId()
 
@@ -44,10 +24,7 @@ const cancelButton = useTemplateRef<HTMLButtonElement>('cancelButton')
 
 /**
  * The task the question is about, or `null` while nothing is being asked.
- *
- * `shallowRef` because the sheet only reads two fields off it and never writes
- * one back; a deep ref would turn the board's task into a reactive copy of
- * itself the moment it was handed over.
+ * `shallowRef`: the sheet reads two fields off it and never writes one back.
  */
 const target = shallowRef<Task | null>(null)
 
@@ -77,12 +54,8 @@ function open(task: Task): void {
     element.showModal()
   }
 
-  // Placed by hand rather than left to the dialog's own focusing steps, which
-  // would take the first focusable thing in the sheet. That is 取消 today, but
-  // only by source order — a close cross added to the head later would quietly
-  // take the focus, and where it sits is a stated requirement here, not a
-  // consequence of the running order. Deferred a tick for the same reason the
-  // element is: the button is only focusable once the sheet is actually up.
+  // Placed by hand: the dialog's own steps would take whatever is first in source
+  // order. Deferred a tick, since the button is focusable only once the sheet is up.
   void nextTick(() => {
     cancelButton.value?.focus()
   })
@@ -100,15 +73,10 @@ function close(): void {
 defineExpose<DeleteDialogExposed>({ open, close })
 
 // [AI assisted 006] 確定不會自己關窗：刪除可能失敗（404、斷線），關窗留給呼叫端在
-// DELETE 回來之後做 —— 一張已經消失的確認框會把問題連同答案一起帶走。跟 TaskDialog 的
-// submit 同一條規則。
+// DELETE 回來之後做。跟 TaskDialog 的 submit 同一條規則。
 /**
- * Hands the answer up, with the docket it is about.
- *
- * The guard is unreachable through the interface — the sheet is only up because
- * `open()` put a task on it — and is here because "confirm carries a task" is
- * the promise `DeleteDialogEmits` makes, and an emit of `null` would break it
- * rather than report it.
+ * Hands the answer up, with the docket it is about. The guard is unreachable through
+ * the interface, and upholds the promise `DeleteDialogEmits` makes.
  */
 function onConfirm(): void {
   const task = target.value
@@ -121,14 +89,8 @@ function onConfirm(): void {
 
 <template>
   <!--
-    m-auto is not decoration: Tailwind's preflight zeroes every margin, which
-    takes with it the `margin: auto` the browser centres a modal dialog with.
-    p-0 for the same reason in reverse — the UA gives a dialog its own padding,
-    and the head and the body each carry their own.
-
-    Narrower than the form sheet (390px against 430px) and red along the top:
-    one question needs less paper than four fields, and the red rule is the
-    first thing that says this sheet is not the other one.
+    m-auto restores the centring preflight zeroes; p-0 drops the UA's own padding.
+    Narrower than the form sheet and red along the top: one question, not four fields.
   -->
   <dialog
     ref="deleteDialogEl"
@@ -158,9 +120,8 @@ function onConfirm(): void {
 
     <div class="grid gap-3 px-[17px] pt-[15px] pb-[17px]">
       <!--
-        The title copied out onto the paper, ruled off in red down its left
-        edge. anywhere rather than a truncation: a title cut short is a title
-        that might belong to a different docket than the one being deleted.
+        The title copied onto the paper. anywhere rather than truncation: a title
+        cut short might belong to a different docket than the one being deleted.
       -->
       <p
         data-quote
@@ -170,9 +131,8 @@ function onConfirm(): void {
       </p>
 
       <!--
-        The dialog's description, so `alertdialog` reads it out on opening. It
-        says what happens and that it cannot be taken back — the two things a
-        person needs before pressing the red button, rather than after.
+        The dialog's description, so `alertdialog` reads it out on opening: what
+        happens, and that it cannot be taken back.
       -->
       <p
         :id="`${uid}-warning`"
@@ -182,9 +142,8 @@ function onConfirm(): void {
       </p>
 
       <!--
-        The same 取消／確定 pair as every other sheet: what is at stake is
-        carried by the red rule, the red button and the line above them, not by
-        renaming the button to 刪除 on this one screen.
+        The same 取消／確定 pair as every other sheet: the stakes are carried by
+        the red rule and button, not by renaming 確定 to 刪除 on this one screen.
       -->
       <div class="flex justify-end gap-[9px]">
         <button

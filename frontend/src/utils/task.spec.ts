@@ -71,10 +71,8 @@ describe('isOverdue', () => {
   })
 
   it('compares against the local calendar day, not the UTC one', () => {
-    // Called without a reference date, the default must be the day the *user*
-    // is having. Deriving it from `toISOString()` would put anyone east of
-    // Greenwich on yesterday's date for the first hours of every morning, and
-    // a task due yesterday would quietly stop being overdue until noon.
+    // The default must be the day the *user* is having: `toISOString()` would put
+    // anyone east of Greenwich a day behind every morning, un-overdue-ing a task.
     const now = new Date()
     const yesterday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1)
     const pad = (value: number) => String(value).padStart(2, '0')

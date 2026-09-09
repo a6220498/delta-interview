@@ -10,25 +10,20 @@ function mountNotice(reason = '資料庫連線失敗。') {
 
 describe('LoadFailure', () => {
   it('names what failed, so the reason is not the whole message', () => {
-    // The backend's problem detail says what went wrong on the server; it does
-    // not say what the reader lost. Both halves are needed for the notice to
-    // mean anything on its own.
+    // The problem detail says what went wrong on the server, not what the reader
+    // lost. Both halves are needed for the notice to mean anything on its own.
     expect(mountNotice().text()).toContain('工單載不出來')
   })
 
   it("prints the backend's own reason rather than a generic apology", () => {
-    // The reason is the actionable half — a 503 and a bad gateway want
-    // different things from the reader — so it is passed in rather than
-    // flattened into one house sentence.
+    // The reason is the actionable half — a 503 and a bad gateway want different
+    // things — so it is passed in rather than flattened into one house sentence.
     expect(mountNotice('伺服器回 503。').text()).toContain('伺服器回 503。')
   })
 
   it('announces itself, because nobody asked for the load that failed', () => {
-    // The load runs on its own at first paint. Without an announcement a
-    // screen-reader user meets an empty board with no idea why it is empty.
-    // Asked for by selector rather than off `wrapper.element`: the explanatory
-    // comment above the notice is a node of its own in dev, so the root of the
-    // mounted tree is that comment and not the box.
+    // The load runs on its own, so without an announcement a screen-reader user meets
+    // an empty board. By selector: in dev the root of the tree is a comment node.
     expect(mountNotice().get('[role="alert"]').text()).toContain('工單載不出來')
   })
 
@@ -43,9 +38,8 @@ describe('LoadFailure', () => {
   })
 
   it('reports every press, so an impatient second try is not swallowed', async () => {
-    // Deliberately not disabled or debounced here: whether a second attempt is
-    // worth making is the owner's call, and it is the owner that knows whether
-    // the first one is still in flight.
+    // Not disabled or debounced here: whether a second attempt is worth making is
+    // the owner's call, and only the owner knows if the first is still in flight.
     const wrapper = mountNotice()
 
     await wrapper.get('[data-retry]').trigger('click')

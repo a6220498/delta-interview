@@ -11,16 +11,8 @@ const COMPLETED_BY_FILTER: Record<Exclude<TaskFilter, 'all'>, 'true' | 'false'> 
 }
 
 /**
- * Fetches the task list, optionally narrowed to one completion state.
- *
- * The filter is applied server-side via the contract's `completed` parameter
- * rather than in the client: filtering after the fact would make that parameter
- * dead and would still pull every task over the wire.
- *
- * The rows come back as {@link TaskSummary} — the task without its
- * `description`. No card on the board draws the detail and it is the one
- * unbounded field a task has, so it travels one docket at a time through
- * {@link getTask} instead of on every row of every refresh.
+ * Fetches the task list, filtered server-side so no discarded task crosses the wire.
+ * Rows arrive without `description`; that travels one task at a time via {@link getTask}.
  *
  * @param filter - which tasks to fetch; `'all'` sends no query parameter.
  * @returns the matching tasks, newest first, each without its description.
@@ -32,11 +24,7 @@ export function listTasks(filter: TaskFilter = 'all'): Promise<TaskSummary[]> {
 }
 
 /**
- * Fetches a single task, detail included.
- *
- * The only place a `description` comes from: {@link listTasks} leaves it out,
- * so whoever needs the whole task — the edit sheet — asks for that one task
- * here.
+ * Fetches a single task, detail included — the only place a `description` comes from.
  *
  * @param id - the task's identifier.
  * @returns the whole task, `description` and all.
@@ -59,10 +47,8 @@ export function createTask(input: CreateTaskRequest): Promise<Task> {
 }
 
 /**
- * Replaces a task's editable fields.
- *
- * Completion state is deliberately not part of this payload — it belongs to
- * {@link setTaskCompletion}, so saving an edit cannot reopen a finished task.
+ * Replaces a task's editable fields. Completion state is not in this payload — it
+ * belongs to {@link setTaskCompletion}, so saving an edit cannot reopen a task.
  *
  * @param id - the task to update.
  * @param input - the replacement title and description.
@@ -74,10 +60,8 @@ export function updateTask(id: string, input: UpdateTaskRequest): Promise<Task> 
 }
 
 /**
- * Marks a task complete or incomplete.
- *
- * Takes the target state rather than toggling, which keeps the call idempotent:
- * two rapid clicks settle on the same result instead of racing.
+ * Marks a task complete or incomplete. Takes the target state rather than
+ * toggling, so two rapid clicks settle on the same result instead of racing.
  *
  * @param id - the task to change.
  * @param completed - the desired completion state.

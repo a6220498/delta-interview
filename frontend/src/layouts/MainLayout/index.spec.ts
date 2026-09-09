@@ -4,12 +4,8 @@ import { describe, expect, it } from 'vitest'
 import MainLayout from './index.vue'
 
 /**
- * The text a screen reader would announce for `element`: its text content with
- * every `aria-hidden` subtree removed, which is how an accessible name gets
- * computed from an element's contents.
- *
- * Vue Test Utils' `.text()` is raw `textContent` and keeps decorative glyphs, so
- * asserting on it would pass a button whose name reads `＋新增工單`.
+ * The text a screen reader would announce for `element`: its content with every
+ * `aria-hidden` subtree removed, which `.text()` would keep as `＋新增工單`.
  */
 function accessibleName(element: Element): string {
   const clone = element.cloneNode(true) as Element
@@ -18,14 +14,8 @@ function accessibleName(element: Element): string {
 }
 
 /**
- * The slot cases assert both halves of a placement: the content lands where it
- * belongs *and* does not also show up in the other landmark. Asserting only the
- * first would still pass if the two elements were nested, which would hand a
- * screen reader one landmark instead of two.
- *
- * The fixtures deliberately avoid the words the layout renders by default —
- * slot content reading `看板` would be indistinguishable from the default
- * heading, so a dropped slot would still pass.
+ * The slot cases assert both halves: content lands where it belongs and not in the
+ * other landmark. The fixtures avoid the words the layout renders by default.
  */
 describe('MainLayout', () => {
   it('places header slot content in the <header> landmark only', () => {

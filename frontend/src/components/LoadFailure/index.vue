@@ -1,17 +1,7 @@
 <script setup lang="ts">
 /**
- * The notice a screen puts up when it could not fetch what it was meant to
- * show: what was lost, why, and one way out of it.
- *
- * `docs/ui-spec.html` 節 02「失敗 / Failed」: the message says what to do rather
- * than apologising, so the reason travels in and the way out is a button
- * instead of an instruction to reload the page.
- *
- * Its own component rather than markup on the board, because the board is not
- * the only thing that can fail to load and a notice written into one screen
- * cannot be put on the next one. It stays a pure statement — no store, no
- * fetch, no knowledge of what failed — so the screen that raises it keeps
- * deciding what 重試 costs.
+ * The notice a screen puts up when it could not fetch its contents: what was lost,
+ * why, and one way out. A pure statement — no store, no fetch (`docs/ui-spec.html` 節 02).
  */
 import type { LoadFailureEmits, LoadFailureProps } from './types'
 
@@ -22,12 +12,8 @@ const emit = defineEmits<LoadFailureEmits>()
 
 <template>
   <!--
-    role="alert" because nobody asked for the load that failed — it runs on its
-    own — so without an announcement a screen-reader user meets an empty screen
-    with no idea why it is empty.
-
-    No margin of its own: where the notice sits relative to what it is about
-    belongs to the screen that raises it, and arrives as a fallthrough class.
+    role="alert" because nobody asked for the load that failed. No margin of its
+    own: placement belongs to the screen that raises it, via a fallthrough class.
   -->
   <div
     role="alert"
@@ -41,9 +27,8 @@ const emit = defineEmits<LoadFailureEmits>()
     <span class="text-[12.5px] text-ink-2">{{ reason }}</span>
 
     <!--
-      A backend that was down at first paint must not cost a page reload once
-      it is back up. Outlined rather than filled: it offers a way out of the
-      failure, and a solid alert-coloured button reads as the destructive kind.
+      Outlined rather than filled: it offers a way out of the failure, and a solid
+      alert-coloured button reads as the destructive kind.
     -->
     <button
       type="button"

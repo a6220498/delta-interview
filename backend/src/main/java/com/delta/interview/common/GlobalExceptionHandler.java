@@ -7,12 +7,8 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 /**
- * Translates domain exceptions into the {@code Problem} shape declared in the contract.
- *
- * <p>Bean-validation and malformed-body failures are deliberately not handled
- * here: {@code spring.mvc.problemdetails.enabled} already renders those as
- * RFC 9457 problem details, and duplicating that logic would let the two
- * representations drift apart.
+ * Translates domain exceptions into the contract's {@code Problem} shape. Validation and
+ * malformed-body failures are left to {@code spring.mvc.problemdetails.enabled}.
  */
 @RestControllerAdvice
 public class GlobalExceptionHandler {

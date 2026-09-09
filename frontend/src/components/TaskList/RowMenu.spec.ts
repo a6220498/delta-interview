@@ -5,14 +5,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import RowMenu from './RowMenu.vue'
 
 /**
- * The top layer, stood in for.
- *
- * jsdom 30 has no popover support at all — `showPopover` is not a function, so
- * the panel would throw as it mounted — and it lays nothing out, so every box
- * measured below is one this file put there. What is testable here is the
- * component's own arithmetic and the events it sends; the light dismiss, the
- * Esc key and the focus handed back to the three-dot button are the browser's,
- * and are exactly why the panel is a native popover rather than a div.
+ * The top layer, stood in for: jsdom 30 has no popover support and lays nothing out.
+ * Testable here is the component's own arithmetic and the events it sends.
  */
 const showing = new WeakSet<HTMLElement>()
 
@@ -81,10 +75,8 @@ afterEach(() => {
 })
 
 /**
- * A three-dot button for the panel to hang from, with a dot inside it.
- *
- * Put in the document rather than left detached: a press is classified by a
- * capturing listener on the document, which an unattached button never reaches.
+ * A three-dot button for the panel to hang from. In the document, not detached: a
+ * press is classified by a capturing listener an unattached button never reaches.
  */
 function anchorAt(box: Partial<DOMRect> = BUTTON): HTMLButtonElement {
   const button = document.createElement('button')
@@ -120,12 +112,8 @@ function mountMenu(anchor: HTMLElement = anchorAt(), subject: TaskSummary = task
 type Menu = ReturnType<typeof mountMenu>
 
 /**
- * The panel itself.
- *
- * Asked for by its `popover` attribute rather than taken from `menu.element`:
- * the component is written with a comment above its root, which the test
- * utilities read as more than one root node — `element` is then the container
- * the wrapper was mounted into, not the panel.
+ * The panel itself, asked for by its `popover` attribute: the component has a comment
+ * above its root, so `menu.element` is the mount container rather than the panel.
  */
 function panelOf(menu: Menu): HTMLElement {
   return menu.get<HTMLElement>('[popover]').element
@@ -188,10 +176,8 @@ describe('RowMenu', () => {
     })
 
     it('takes itself away as it answers, and says so once', async () => {
-      // Unlike the confirmation next door, nothing here can fail: 編輯 opens a
-      // sheet and 刪除 asks a question, and neither goes to the server. So the
-      // panel does not wait to be dismissed — but it may only report going once,
-      // however many ways the hiding comes back to it.
+      // Nothing here can fail, so the panel does not wait to be dismissed — but it
+      // may report going only once, however many ways the hiding comes back.
       const menu = mountMenu()
 
       await menu.get('[data-edit]').trigger('click')
@@ -221,10 +207,8 @@ describe('RowMenu', () => {
     })
 
     it('goes on a press on the three-dot button, and says that is what it was', () => {
-      // Taken away on the press rather than on the click, and before the
-      // browser's own light dismiss would do it: the card has to know which
-      // kind of dismissal this was before the click the same press produces,
-      // or the button reopens what it has just closed.
+      // Taken away on the press, before the browser's light dismiss: the card needs
+      // to know the kind of dismissal before the click, or the button reopens it.
       const button = anchorAt()
       const menu = mountMenu(button)
 
@@ -301,9 +285,8 @@ describe('RowMenu', () => {
     })
 
     it('stops watching the document once it is gone', () => {
-      // The panel is mounted and unmounted on every press of a three-dot
-      // button, so a listener left behind is one per press for the whole
-      // session.
+      // Mounted and unmounted on every press, so a listener left behind is one per
+      // press for the whole session.
       const added = vi.spyOn(document, 'addEventListener')
       const menu = mountMenu()
       const handler = added.mock.calls.find(([type]) => type === 'pointerdown')?.[1]
@@ -356,9 +339,8 @@ describe('RowMenu', () => {
     })
 
     it('puts the focus on 編輯 through the browser, not by hand', () => {
-      // `autofocus` is named inside the browser's own popover-showing steps,
-      // which is what leaves it able to hand focus back to the three-dot button
-      // afterwards; a `focus()` of our own would take that away.
+      // `autofocus` is named inside the browser's popover-showing steps, which is what
+      // lets it hand focus back afterwards; our own `focus()` would take that away.
       const menu = mountMenu()
 
       expect(menu.get('[data-edit]').attributes('autofocus')).toBeDefined()

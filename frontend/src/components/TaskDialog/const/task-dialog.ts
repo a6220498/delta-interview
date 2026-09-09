@@ -9,59 +9,36 @@ export const HEADINGS: Record<TaskDialogMode, string> = {
 }
 
 /**
- * Stands in for the number while the sheet is still blank.
- *
- * A new task has no number yet — the serial is drawn from the chosen category's
- * counter by the server — so the slot says so rather than sitting empty, which
- * would read as a number that failed to load.
+ * Stands in for the number while the sheet is still blank. The server draws the
+ * serial from the chosen category's counter, so an empty slot would read as a failure.
  */
 export const NEW_NUMBER = 'NEW'
 
 /**
- * The categories offered, in the order the spec lists them.
- *
- * Only the ordering and the Chinese gloss live here: the `bug` / `feat` prefix
- * each option is drawn with comes from `categoryDisplay()`, the same lookup a
- * card's number uses, so the select and the stub can never name a category
- * differently.
+ * The categories offered, in the order the spec lists them. Only ordering and the
+ * Chinese gloss live here; the prefix comes from `categoryDisplay()`.
  */
 export const CATEGORY_OPTIONS: readonly CategoryOption[] = [
   { value: 1, name: '修復' },
   { value: 0, name: '新功能' },
 ]
 
-/**
- * What a blank sheet starts on.
- *
- * `bug` rather than the lower code, because it is the first option the spec
- * lists and a select that opens on its own first row is what a person expects.
- */
+/** What a blank sheet starts on: the first option the spec lists. */
 export const DEFAULT_CATEGORY: TaskCategory = 1
 
 /**
- * The contract's own length limits, as `maxlength` on the two text fields.
- *
- * The server validates these regardless; enforcing them in the field as well
- * means a person is stopped at the 200th character rather than at a 400 after
- * they have finished writing.
+ * The contract's own length limits, as `maxlength` on the two text fields, so a
+ * person is stopped at the 200th character rather than at a 400 afterwards.
  */
 export const FIELD_LIMITS = { title: 200, description: 2000 } as const
 
 /**
- * Everything the sheet's own message rows can say.
- *
- * Two lines so far. The hint rows under the fields stay empty and keep their
- * height, which is what they are for: a message appearing must not push the
- * rest of the form down and take the reader's place on it along with it.
+ * Everything the sheet's own message rows can say. The hint rows keep their height
+ * when empty, so a message appearing cannot push the rest of the form down.
  */
 export const MESSAGES = {
   /** Shown under 標題 when 確定 is pressed with nothing in it. */
   titleRequired: '標題不能空白。',
-  /**
-   * Heads the notice above the buttons when a save came back refused.
-   *
-   * `docs/ui-spec.html` 節 02「失敗 / Failed」: it says what happened rather
-   * than apologising, and the server's own reason is printed underneath it.
-   */
+  /** Heads the notice above the buttons when a save came back refused. */
   saveFailed: '這張單子沒存進去',
 }

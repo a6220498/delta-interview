@@ -17,22 +17,12 @@ function jsonResponse(status: number, body: unknown): Response {
 }
 
 /**
- * jsdom 30 ships `<dialog>` as an element but almost none of its behaviour:
- * the prototype carries the reflected `open` property and nothing else, so
- * `showModal` is not a function at all and opening the sheet would throw before
- * a single assertion ran.
- *
- * These stand-ins do the two things the component actually depends on — `open`
- * flipping, and `close` firing the event the browser fires when Esc dismisses a
- * dialog. Everything the real element does beyond that (the top layer, the focus
- * trap, the backdrop) is the browser's, is untestable here, and is exactly why
- * the component uses a native dialog instead of building its own.
+ * jsdom 30 ships `<dialog>` with the reflected `open` and nothing else. These stand-ins
+ * do the two things the component depends on: `open` flipping, and `close` firing.
  */
 beforeEach(() => {
-  // The sheet files its own save, so a submit needs both somewhere to file into
-  // and a server to answer. A fresh pinia per test, because Pinia keeps one
-  // store instance per pinia: a task filed in one test would otherwise still be
-  // on the list in the next.
+  // The sheet files its own save, so a submit needs somewhere to file into and a
+  // server to answer. A fresh pinia per test, or one test's task outlives it.
   setActivePinia(createPinia())
   vi.stubGlobal('fetch', fetchMock)
   fetchMock.mockReset()
@@ -77,10 +67,8 @@ function mountSheet() {
 }
 
 /**
- * Mounts a sheet and opens it blank.
- *
- * Awaited, unlike the props this component used to take: the values are written
- * to the fields as the sheet opens, so the DOM is one tick behind the call.
+ * Mounts a sheet and opens it blank. Awaited: the values are written to the fields
+ * as the sheet opens, so the DOM is one tick behind the call.
  */
 async function mountCreate() {
   const wrapper = mountSheet()
@@ -153,9 +141,8 @@ describe('TaskDialog', () => {
     })
 
     it('leaves nothing of the task it was last opened on', async () => {
-      // One sheet serves both jobs now, so a blank one opened after an edit is
-      // the same element with the same fields — emptied, or the new task starts
-      // life carrying the last one's title.
+      // One sheet serves both jobs, so a blank one opened after an edit is the same
+      // element — emptied, or the new task starts life carrying the last one's title.
       const wrapper = await mountEdit()
 
       wrapper.vm.open('create')
@@ -192,9 +179,8 @@ describe('TaskDialog', () => {
     })
 
     it('leaves the optional fields blank when the task has neither', async () => {
-      // The contract sends `null` for "not set". Assigned straight to an input
-      // that renders the four characters `null`, which a person would then have
-      // to delete before typing.
+      // The contract sends `null` for "not set"; assigned straight to an input that
+      // renders the four characters `null`, to be deleted before typing.
       const wrapper = await mountEdit(task({ description: null, dueDate: null }))
 
       expect(valueOf(wrapper, 'description')).toBe('')
@@ -202,9 +188,8 @@ describe('TaskDialog', () => {
     })
 
     it('reseeds when reopened on a different task', async () => {
-      // The values are read once, as the sheet opens. Reopening on another task
-      // without re-reading them would show the previous task's title under the
-      // new task's number.
+      // The values are read once, as the sheet opens; without re-reading, the
+      // previous task's title would sit under the new task's number.
       const wrapper = await mountEdit()
 
       wrapper.vm.close()
@@ -216,9 +201,8 @@ describe('TaskDialog', () => {
     })
 
     it('starts the caret in 標題 with the old title selected', async () => {
-      // The spec's own behaviour: the sheet opens ready to have its title typed
-      // over. Selecting is why the focus waits a tick — run before the fields
-      // are written it would select whatever the box held a render ago.
+      // The sheet opens ready to have its title typed over. Selecting is why focus
+      // waits a tick: run earlier it would take whatever the box held before.
       const wrapper = await mountEdit()
       const input = wrapper.get<HTMLInputElement>('[data-field="title"] input').element
 
@@ -230,10 +214,8 @@ describe('TaskDialog', () => {
 
   describe('提示列', () => {
     it('keeps every row empty but standing, apart from the one with a message', async () => {
-      // The rows exist to hold their height, so a message appearing does not
-      // push the form down under the reader. Changing category writes nothing:
-      // the number a task would be re-issued is the server's to assign, so
-      // there is nothing truthful to say about it here.
+      // The rows hold their height so a message cannot push the form down. Changing
+      // category writes nothing: the re-issued number is the server's to assign.
       const wrapper = await mountEdit()
 
       await wrapper.get('select').setValue(0)
@@ -284,11 +266,8 @@ describe('TaskDialog', () => {
     })
 
     it('reddens the line as well as the message, focus included', async () => {
-      // A red message beside a black line reads as a note about the form; the
-      // whole field has to say which one is wrong — the line and the weight
-      // under it both. Failing validation also puts the caret in this field, so
-      // a standing focus colour would take the red away at the one moment it is
-      // needed.
+      // The whole field has to say which one is wrong. Failing validation puts the
+      // caret here, so a standing focus colour would take the red away just then.
       const wrapper = await mountCreate()
 
       await wrapper.get('form').trigger('submit')
@@ -425,8 +404,7 @@ describe('TaskDialog', () => {
     })
 
     it('says so even when the request never reached a server', async () => {
-      // `fetch` rejects outright when the backend is not running, which is the
-      // likeliest failure in development and carries no status to read. A 確定
+      // `fetch` rejects outright when the backend is down, carrying no status. A 確定
       // that appeared to do nothing cannot be told apart from a broken button.
       const wrapper = await mountCreate()
       fetchMock.mockRejectedValue(new TypeError('Failed to fetch'))
@@ -502,9 +480,8 @@ describe('TaskDialog', () => {
 
   describe('開關', () => {
     it('stays down until it is asked for', () => {
-      // Nothing but `open()` puts the sheet up, so a page can mount it once and
-      // leave it there — which is what lets the browser hand focus back to
-      // whichever control opened it.
+      // Nothing but `open()` puts the sheet up, so a page can mount it once and leave
+      // it there — which is what lets the browser hand focus back.
       const wrapper = mountSheet()
 
       expect(wrapper.get('dialog').attributes('open')).toBeUndefined()
@@ -523,9 +500,8 @@ describe('TaskDialog', () => {
     })
 
     it('moves an open sheet onto another task without opening it twice', async () => {
-      // showModal() on a dialog that is already open throws, and the owner is
-      // entitled to call open() again — the row menu of a second card while the
-      // first is still on the desk.
+      // showModal() on an already-open dialog throws, and the owner is entitled to
+      // call open() again — a second card's row menu while the first is on the desk.
       const wrapper = await mountEdit()
       const showModal = vi.spyOn(wrapper.get<HTMLDialogElement>('dialog').element, 'showModal')
 
@@ -598,11 +574,8 @@ describe('TaskDialog', () => {
     })
 
     it('gives two sheets on one page two sets of ids', () => {
-      // Hard-coded ids would leave one label pointing at the other sheet's
-      // field, which is worse than having no label at all. Both sheets are
-      // mounted inside one app on purpose: `useId` counts per app, so two
-      // separate `mount()` calls would both start at the same number and the
-      // test would pass on components that share every id.
+      // Hard-coded ids would leave one label pointing at the other sheet's field. Both
+      // mounted in one app: `useId` counts per app, so separate mounts would collide.
       const wrapper = mount(
         defineComponent({
           render: () => [h(TaskDialog), h(TaskDialog)],

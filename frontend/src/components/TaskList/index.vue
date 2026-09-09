@@ -1,19 +1,7 @@
 <script setup lang="ts">
 /**
- * One shelf of the board: a recessed tray holding the dockets for a single
- * completion state, with the rack's name, a tally of what is on it and the
- * pressed lettering a physical in/out tray carries.
- *
- * Deliberately one component rendered once per rack rather than a component
- * per rack. The two trays are the same object in every respect but four words
- * and a colour, so a pair of near-identical files would drift the moment one of
- * them is touched. Everything that differs arrives in `rack`, one row of the
- * board's table — the tray draws that row and holds no table of its own, so it
- * cannot disagree with the board about what a shelf is called.
- *
- * The tray takes its tasks as a prop and does no filtering: which tasks belong
- * on which shelf is one decision, and making it twice — once per instance —
- * is how a task ends up on both shelves or on neither.
+ * One shelf of the board, rendered once per rack: everything that differs arrives
+ * in `rack`. It takes its tasks as a prop and does no filtering of its own.
  */
 import Card from './Card.vue'
 import type { TaskListEmits, TaskListProps } from './types'
@@ -25,8 +13,7 @@ const emit = defineEmits<TaskListEmits>()
 
 <template>
   <!--
-    The heavy ink edge runs along the top only, the way a tray's front lip is
-    the one you see; the other three sides are the shallow tray-edge. min-h
+    The heavy ink edge runs along the top only, like a tray's front lip. min-h
     keeps an empty shelf from collapsing next to a full one.
   -->
   <div
@@ -40,10 +27,7 @@ const emit = defineEmits<TaskListEmits>()
         {{ props.rack.title }}
       </h3>
 
-      <!--
-        Left in the accessibility tree on purpose: read straight after the
-        heading it says "未完成, 3", which is the whole point of the tally.
-      -->
+      <!-- Left in the accessibility tree: read after the heading it says "未完成, 3". -->
       <span
         data-tally
         class="min-w-[26px] rounded-sm px-1.5 pt-[5px] pb-1.5 text-center text-[15px] leading-none font-bold tabular-nums text-stock"
@@ -52,10 +36,7 @@ const emit = defineEmits<TaskListEmits>()
         {{ props.tasks.length }}
       </span>
 
-      <!--
-        Lettering stamped into the tray itself, not a second name for the rack —
-        announcing it would repeat 未完成 in English.
-      -->
+      <!-- Lettering stamped into the tray; announcing it would repeat 未完成 in English. -->
       <span
         data-hint
         aria-hidden="true"
@@ -66,14 +47,8 @@ const emit = defineEmits<TaskListEmits>()
     </div>
 
     <!--
-      The empty notice replaces the list rather than sitting inside it, so an
-      empty shelf is never announced as a list of one.
-
-      The same box carries the wait, so the tray keeps its height and nothing
-      below it moves when the tasks land. Which of the two it says is the only
-      difference: an empty shelf points at the next action, a shelf that has not
-      arrived must not — 新增工單 offered over tasks still in flight invites a
-      second copy of one the reader already has.
+      Replaces the list rather than sitting inside it, so an empty shelf is never
+      announced as a list of one. The same box carries the wait, keeping the height.
     -->
     <p
       v-if="props.tasks.length === 0"
@@ -83,9 +58,8 @@ const emit = defineEmits<TaskListEmits>()
     </p>
 
     <!--
-      role="list" is explicit because preflight strips the list markers, and
-      some browsers drop list semantics along with them — which would cost the
-      "3 items" a reader gets before deciding whether to go through the shelf.
+      role="list" is explicit: preflight strips the markers and some browsers drop
+      list semantics with them, costing the "3 items" a reader gets up front.
     -->
     <ul
       v-else

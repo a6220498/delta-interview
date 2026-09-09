@@ -24,15 +24,8 @@ import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 
 /**
- * Verifies the five task operations against the contract's promises: status
- * codes, filtering semantics, per-category serial numbering, and the guarantee
- * that completion state and editable fields are owned by different endpoints.
- *
- * <p>All tests share one application context, so the repository's serial
- * counters carry over between them. Every serial assertion is therefore written
- * against numbers read back within the same test, never against an absolute
- * value like "the first bug is 1" — which would only hold when the test happens
- * to run first.
+ * Verifies the five task operations against the contract's promises. One shared context,
+ * so every serial assertion is written against numbers read back in the same test.
  */
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -110,8 +103,7 @@ class TaskControllerTest {
         }
 
         // [AI assisted 005] category 改成數字碼之後，這個測試鎖住兩件事：範圍外的碼要被擋掉，
-        // 以及舊契約的字串類別名不會被靜默接受 —— 沒跟上這次改動的客戶端會在邊界收到 400，
-        // 而不是把壞資料寫進來。
+        // 以及舊契約的字串類別名不會被靜默接受，而不是把壞資料寫進來。
         @Test
         @DisplayName("rejects a category outside the enum rather than storing an unrenderable value")
         void rejectsUnknownCategory() throws Exception {
@@ -249,9 +241,8 @@ class TaskControllerTest {
                     // URLs and in-flight requests hold the id, so a move must not touch it…
                     .andExpect(jsonPath("$.id", is(misfiled.toString())))
                     .andExpect(jsonPath("$.category", is(1)))
-                    // …while the displayed number follows the category, drawn fresh from the
-                    // destination counter so it cannot collide with the bug already holding
-                    // the serial this task arrived with.
+                    // …while the displayed number follows the category, drawn fresh from
+                    // the destination counter so it cannot collide with an existing serial.
                     .andExpect(jsonPath("$.sequence", is(latestBug + 1)));
         }
 

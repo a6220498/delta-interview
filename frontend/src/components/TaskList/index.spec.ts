@@ -8,9 +8,8 @@ import Card from './Card.vue'
 import TaskList from './index.vue'
 
 /**
- * Builds one of the rows the board hands down; only the fields this component
- * reads are varied. A `TaskSummary` and not a `Task`: the shelf is drawn from
- * what `GET /api/tasks` returns, which carries no description.
+ * Builds one of the rows the board hands down. A `TaskSummary`, not a `Task`: the
+ * shelf is drawn from what `GET /api/tasks` returns, which carries no description.
  */
 function task(overrides: Partial<TaskSummary> = {}): TaskSummary {
   return {
@@ -32,11 +31,8 @@ const skeleton = task({ id: 'c', sequence: 3 })
 const three = [cors, readme, skeleton]
 
 /**
- * The rack filed under `id`, taken from the table the board itself hangs.
- *
- * Looked up rather than written out here: the tray draws whatever row it is
- * handed, so a fixture row would let the tray and the real table drift while
- * these tests went on passing.
+ * The rack filed under `id`, taken from the table the board itself hangs. A fixture
+ * row would let the tray and the real table drift while these tests kept passing.
  */
 function rack(id: string): TaskRack {
   const row = TASK_RACKS.find((candidate) => candidate.id === id)
@@ -54,11 +50,8 @@ function mountList(tasks: TaskSummary[]) {
 }
 
 /**
- * The card the list rendered in position `index`.
- *
- * The explicit failure matters: indexing yields `undefined` for a short render,
- * and `undefined?.vm.$emit(...)` would leave the forwarding assertions below
- * passing against an event that was never sent.
+ * The card the list rendered in position `index`. The explicit failure matters, or
+ * `undefined?.vm.$emit(...)` would pass the forwarding assertions on nothing.
  */
 function cardAt(wrapper: ReturnType<typeof mountList>, index: number) {
   const card = wrapper.findAllComponents(Card)[index]
@@ -131,9 +124,8 @@ describe('TaskList', () => {
 
   describe('while the board is loading', () => {
     it('says the shelf is still coming rather than that it is empty', () => {
-      // An empty shelf and a shelf that has not arrived are the same `tasks`
-      // prop; only this flag tells them apart, and pointing someone at 新增工單
-      // before the load lands invites a duplicate of a task they already have.
+      // An empty shelf and one that has not arrived are the same `tasks` prop; only
+      // this flag tells them apart, and 新增工單 offered too early invites a duplicate.
       const wrapper = mount(TaskList, { props: { rack: rack('open'), tasks: [], loading: true } })
 
       expect(wrapper.text()).toContain('載入中')
