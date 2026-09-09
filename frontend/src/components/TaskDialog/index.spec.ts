@@ -111,6 +111,9 @@ async function save(wrapper: ReturnType<typeof mountSheet>): Promise<void> {
   await flushPromises()
 }
 
+// [AI assisted 011] 只推 `Date.now`，不動計時器：`flushPromises` 等的是 `setImmediate`，
+// 而 `vi.useFakeTimers()` 預設連它一起接管 —— 時鐘沒人去推，這個檔案裡每一個 await 都會
+// 停在那裡。
 /**
  * Moves the clock past the window the write buttons are throttled by, so a press this
  * suite means as a fresh attempt is not taken for the second half of a double-click.

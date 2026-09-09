@@ -87,11 +87,8 @@ async function stamp(completed: boolean): Promise<void> {
   }
 }
 
-/**
- * What the mark is wired to. The throttle covers the gap `stamping` cannot: a stamp that
- * lands inside a repeat press lowers the guard, and the second press would then ask to
- * put back the state the first one has just changed.
- */
+// [AI assisted 011] `throttle()` 寫在 `<script setup>` 裡，所以每張卡各有一個窗口。這是重點：
+// 若圖方便提到模組層級共用一份，蓋掉一張單會連帶讓旁邊那張在 500ms 內按不動。
 const onToggle = throttle(stamp, WRITE_THROTTLE_MS)
 
 /**

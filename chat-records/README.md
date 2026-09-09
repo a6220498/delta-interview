@@ -13,6 +13,7 @@
 | **006** | [006-board-ui-build.md](./006-board-ui-build.md) | 實現 — 前端 UI | 09-08 16:06 ~ 09-09 04:19 | 看板六個元件（版型／抬頭／托盤與工單卡／工單彈窗／刪除確認／row menu）；前端測試 11 → 143 |
 | **008** | [008-card-detail-dialog.md](./008-card-detail-dialog.md) | 實現 — 前端 UI | 09-09 16:27 ~ 17:12 | 工單明細窗與「點卡片開明細」入口；前端測試 214 → 253 |
 | **009** | [009-mobile-board-layout.md](./009-mobile-board-layout.md) | 實現 — 前端 UI | 09-09 17:17 ~ 20:55 | 375px 版型：架別切換（`RackSwitch`）與右下角浮動新增鈕；前端測試 253 → 265 |
+| **011** | [011-write-button-throttle.md](./011-write-button-throttle.md) | 實現 — 前端 UI | 09-09 21:42 ~ 22:54 | 三顆寫入按鈕加節流（`utils/throttle.ts`、`utils/` barrel、`WRITE_THROTTLE_MS`）；前端測試 266 → 276 |
 
 編號依**對話發生時間**排序，不是依檔案建立時間 —— 001 的 UIUX 設計早於 002 的專案初始化。
 004 回頭改設計（規格頁），排在 003 之後是因為它接續 003 定案的契約欄位 ——
@@ -27,6 +28,15 @@
 所以這張表沒有 007 這一列。008 沒有沿用 007，是因為沿用會讓規格頁裡那 5 條註解指到一份
 講別的事情的紀錄 —— 編號的用途就是讓程式碼查得到對應的對話，撞號等於毀掉它。
 007 的紀錄可以事後補上，transcript 還在。
+
+**010 是第二個缺口，成因和 007 一樣。** `frontend/src/` 裡有 5 條 `[AI assisted 010]`，
+分佈在 `App.vue`、`layouts/MainLayout/index.vue`、`components/TaskList/index.vue`（2 條）
+與 `components/TaskList/RowMenu.vue`，來自 commit `573e913`（RowMenu 改用 anchor 位移關閉、
+托盤高度修正）那場對話，同樣沒有留下紀錄檔。011 沒有沿用 010，理由與 008 不沿用 007 相同。
+
+這兩個缺口也說明**只看這張表的最大編號 +1 是不夠的**：定新編號之前要先
+`grep -rho "AI assisted [0-9]\{3\}" frontend/src docs`，看程式碼裡實際已經用到哪個號碼。
+011 這次就是先寫成 010、收尾檢查時才發現撞號改回來的。
 
 ## 為什麼要有這份索引
 

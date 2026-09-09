@@ -199,12 +199,9 @@ async function save(): Promise<void> {
   }
 }
 
-/**
- * What 確定 is wired to. The throttle covers the gap `saving` cannot: it is raised only
- * once the validation above has passed, so two presses on a sheet with an empty 標題
- * would otherwise both run, and a save that lands inside a repeat press would let the
- * second one file a second docket.
- */
+// [AI assisted 011] 節流是加上去的，不是拿來取代 `saving`：`saving` 要等驗證過了才升起，
+// 標題空白時連按兩下原本兩次都會整段跑完；反過來，請求比窗口慢時擋得住的只有 `saving`。
+// 兩者補的是不同的洞，少一邊就有破口。
 const onSubmit = throttle(save, WRITE_THROTTLE_MS)
 </script>
 

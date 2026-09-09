@@ -124,11 +124,9 @@ async function withdraw(): Promise<void> {
   }
 }
 
-/**
- * What 確定 is wired to. The throttle covers the gap `deleting` cannot: a DELETE that
- * lands inside a repeat press lowers the guard while the second press is still coming,
- * and that one would answer 404 on a docket that went away perfectly well.
- */
+// [AI assisted 011] 窗口從按下那一刻起算，不是從 DELETE 回來起算。關窗本來就要等回應，
+// 若改成從回應起算，一次慢的刪除會把窗口拖到使用者早已鬆手之後，下一次真心要按的人
+// 反而被擋。
 const onConfirm = throttle(withdraw, WRITE_THROTTLE_MS)
 </script>
 
