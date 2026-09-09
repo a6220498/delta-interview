@@ -360,6 +360,53 @@ describe('tasks store', () => {
     })
   })
 
+  describe('setTaskCompletion', () => {
+    const ID = '3f1a7c2e-9b04-4f5d-8a11-6c2d5e0f7b31'
+
+    it("patches the asked-for state to the docket's completion endpoint", async () => {
+      // The target state travels in the body rather than being derived from the row
+      // here, so two presses in a breath ask for the same thing instead of racing.
+      fetchMock.mockResolvedValue(jsonResponse(200, detail({ completed: true })))
+      const store = useTasksStore()
+
+      await store.setTaskCompletion(ID, true)
+
+      expect(lastUrl()).toBe(`/api/tasks/${ID}/completion`)
+      expect(lastInit().method).toBe('PATCH')
+      expect(lastBody()).toEqual({ completed: true })
+    })
+
+    it('swaps the stamped row for the answer, leaving it where it was', async () => {
+      // The board hangs its shelves by filtering `completed`, so this swap is the
+      // whole reason a stamped docket crosses to 已完成 without a reload.
+      const store = useTasksStore()
+      fetchMock.mockResolvedValue(jsonResponse(200, [task({ id: 'a' }), task({ id: 'b' })]))
+      await store.fetchTasks()
+
+      fetchMock.mockResolvedValue(jsonResponse(200, detail({ id: 'b', completed: true })))
+      await store.setTaskCompletion('b', true)
+
+      expect(store.taskList.map((filed) => filed.id)).toEqual(['a', 'b'])
+      expect(store.taskList.map((filed) => filed.completed)).toEqual([false, true])
+    })
+
+    it('leaves the board untouched when the stamp is refused', async () => {
+      // A stamp that did not happen has changed nothing; a row flipped here would
+      // move the docket to the other shelf over a task the server never marked.
+      const store = useTasksStore()
+      fetchMock.mockResolvedValue(jsonResponse(200, [task({ id: 'a' })]))
+      await store.fetchTasks()
+
+      fetchMock.mockResolvedValue(
+        jsonResponse(404, { status: 404, title: 'Not Found', detail: '這張單子已經不在了。' }),
+      )
+
+      await expect(store.setTaskCompletion('a', true)).rejects.toThrow('這張單子已經不在了。')
+      expect(store.taskList[0]?.completed).toBe(false)
+      expect(store.error).toBeNull()
+    })
+  })
+
   describe('deleteTask', () => {
     const ID = '3f1a7c2e-9b04-4f5d-8a11-6c2d5e0f7b31'
 

@@ -17,7 +17,7 @@ import type { TaskSummary } from '@/types/task'
 
 /**
  * The board's tasks, and how the load that fetched them went. `storeToRefs` keeps the
- * reactivity plain destructuring would drop. `toggle` is the one tray event still unhandled.
+ * reactivity plain destructuring would drop. The trays report 編輯 and 刪除, nothing else.
  */
 const tasksStore = useTasksStore()
 const { taskList, loading, error } = storeToRefs(tasksStore)

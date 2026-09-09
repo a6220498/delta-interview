@@ -335,6 +335,46 @@ describe('App', () => {
     })
   })
 
+  describe('標記完成', () => {
+    it('moves a stamped docket from the in-tray onto the 已完成 shelf', async () => {
+      // The point of the whole wiring, and the one claim no unit test can make:
+      // nothing is bound between the card and the board, so what carries the docket
+      // across is the row the store swapped in.
+      fetchMock.mockResolvedValue(jsonResponse(200, [task({ id: 'a' })]))
+      const wrapper = mountBoard()
+      await flushPromises()
+
+      fetchMock.mockResolvedValue(jsonResponse(200, detail({ id: 'a', completed: true })))
+      await wrapper.get('main [aria-pressed]').trigger('click')
+      await flushPromises()
+
+      const [open, done] = wrapper.findAllComponents(TaskList)
+
+      expect(open?.text()).not.toContain('補上 CORS 設定')
+      expect(done?.text()).toContain('補上 CORS 設定')
+      // One load and one PATCH: the answer is the whole task, so reloading the
+      // board would be a second round trip for what the request just returned.
+      expect(fetchMock).toHaveBeenCalledTimes(2)
+    })
+
+    it('takes a reopened docket back to the in-tray', async () => {
+      // The same seam in the other direction: 已完成 is a state a reader can undo,
+      // and a shelf that only ever gains dockets would strand them there.
+      fetchMock.mockResolvedValue(jsonResponse(200, [task({ id: 'a', completed: true })]))
+      const wrapper = mountBoard()
+      await flushPromises()
+
+      fetchMock.mockResolvedValue(jsonResponse(200, detail({ id: 'a', completed: false })))
+      await wrapper.get('main [aria-pressed]').trigger('click')
+      await flushPromises()
+
+      const [open, done] = wrapper.findAllComponents(TaskList)
+
+      expect(open?.text()).toContain('補上 CORS 設定')
+      expect(done?.text()).not.toContain('補上 CORS 設定')
+    })
+  })
+
   describe('刪除確認', () => {
     it('keeps the confirmation mounted but down, alongside the sheet', () => {
       // Both mounted from first paint, so the browser can hand focus back to

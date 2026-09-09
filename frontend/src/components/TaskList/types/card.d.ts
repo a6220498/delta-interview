@@ -10,15 +10,10 @@ export interface CardProps {
 }
 
 /**
- * What the docket reports. It renders state and decides nothing: neither event
- * carries a consequence, only the fact that the reader asked for one.
+ * What the docket reports: the row menu's two choices, and nothing else. The mark is
+ * not among them — the card files its own stamp, since that is a write it can finish.
  */
 export interface CardEmits {
-  /**
-   * The completion mark was pressed, carrying the state the card is asking for.
-   * The target state rather than a toggle, so two fast clicks cannot race.
-   */
-  toggle: [completed: boolean]
   /**
    * 編輯 was chosen in the row menu. What leaves here is the choice, not a task —
    * the shelf above knows which card it rendered and attaches it there.

@@ -3,6 +3,7 @@ import {
   deleteTask as removeTask,
   getTask,
   listTasks,
+  setTaskCompletion as patchCompletion,
   updateTask as putTask,
 } from '@/api/tasks'
 import type {
@@ -114,6 +115,23 @@ export const useTasksStore = defineStore('tasks', () => {
   }
 
   /**
+   * Stamps a task complete or incomplete through `PATCH /api/tasks/{id}/completion` and
+   * swaps the stored row for the answer, which is what moves it to the other rack.
+   *
+   * @param id - The task to stamp.
+   * @param completed - The state being asked for; the endpoint takes a target, not a toggle.
+   * @returns The task in its new state, as the server filed it.
+   * @throws {ApiError} 404 when the task is gone.
+   */
+  async function setTaskCompletion(id: string, completed: boolean): Promise<Task> {
+    const stamped = await patchCompletion(id, completed)
+
+    taskList.value = taskList.value.map((filed) => (filed.id === id ? stamped : filed))
+
+    return stamped
+  }
+
+  /**
    * Withdraws a task through `DELETE /api/tasks/{id}` and takes its row off the board.
    * Throws rather than setting {@link error}: the caller still holds the confirmation.
    *
@@ -129,5 +147,15 @@ export const useTasksStore = defineStore('tasks', () => {
     taskList.value = taskList.value.filter((filed) => filed.id !== id)
   }
 
-  return { taskList, loading, error, fetchTasks, fetchTask, createTask, updateTask, deleteTask }
+  return {
+    taskList,
+    loading,
+    error,
+    fetchTasks,
+    fetchTask,
+    createTask,
+    updateTask,
+    setTaskCompletion,
+    deleteTask,
+  }
 })

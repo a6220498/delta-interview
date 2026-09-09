@@ -72,7 +72,6 @@ const emit = defineEmits<TaskListEmits>()
       >
         <Card
           :task="task"
-          @toggle="emit('toggle', task, $event)"
           @edit="emit('edit', task)"
           @delete="emit('delete', task)"
         />

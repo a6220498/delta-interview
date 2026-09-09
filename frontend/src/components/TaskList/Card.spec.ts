@@ -1,6 +1,7 @@
-import type { TaskSummary } from '@/types/task'
-import { enableAutoUnmount, mount } from '@vue/test-utils'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import type { Task, TaskSummary } from '@/types/task'
+import { enableAutoUnmount, flushPromises, mount } from '@vue/test-utils'
+import { createPinia, setActivePinia } from 'pinia'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { nextTick } from 'vue'
 
 import Card from './Card.vue'
@@ -12,7 +13,17 @@ import RowMenu from './RowMenu.vue'
  */
 const showing = new WeakSet<HTMLElement>()
 
+const fetchMock = vi.fn<typeof fetch>()
+
 beforeEach(() => {
+  // The mark files its own stamp now, so every card needs a board to write to and a
+  // server to answer. A fresh pinia per test: Pinia keeps one store per pinia, and a
+  // list stamped in one test would still be stamped in the next.
+  setActivePinia(createPinia())
+  vi.stubGlobal('fetch', fetchMock)
+  fetchMock.mockReset()
+  fetchMock.mockResolvedValue(jsonResponse(200, detail({ completed: true })))
+
   HTMLElement.prototype.showPopover = function showPopover(this: HTMLElement): void {
     showing.add(this)
   }
@@ -48,6 +59,47 @@ function task(overrides: Partial<TaskSummary> = {}): TaskSummary {
 }
 
 const LONG_PAST = '2020-01-04'
+
+const ID = '3f1a7c2e-9b04-4f5d-8a11-6c2d5e0f7b31'
+
+/** Builds the whole task the completion endpoint answers with: the row plus its detail. */
+function detail(overrides: Partial<Task> = {}): Task {
+  return { ...task(), description: '前端在 5173，後端在 8080。', ...overrides }
+}
+
+/** Builds a `fetch` Response double with the given status and JSON body. */
+function jsonResponse(status: number, body: unknown): Response {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { 'Content-Type': 'application/json' },
+  })
+}
+
+/** Builds the problem body the backend answers with when the docket is gone. */
+function refused(): Response {
+  return jsonResponse(404, { status: 404, title: 'Not Found', detail: '這張單子已經不在了。' })
+}
+
+/** Returns the URL passed to the most recent `fetch` call. */
+function lastUrl(): string {
+  return String(fetchMock.mock.calls.at(-1)?.[0])
+}
+
+/** Returns the options passed to the most recent `fetch` call. */
+function lastInit(): RequestInit {
+  return fetchMock.mock.calls.at(-1)?.[1] ?? {}
+}
+
+/** Returns the JSON body of the most recent `fetch` call. */
+function lastBody(): unknown {
+  return JSON.parse(String(lastInit().body))
+}
+
+/** Presses the completion mark and waits for whatever that put on the wire to come back. */
+async function stamp(wrapper: ReturnType<typeof mount<typeof Card>>): Promise<void> {
+  await wrapper.get('[aria-pressed]').trigger('click')
+  await flushPromises()
+}
 
 /**
  * Mounts a card in the document itself. The row menu is a popover, and a popover has
@@ -124,21 +176,80 @@ describe('Card', () => {
     })
 
     it('asks for an explicit target state rather than a toggle', async () => {
-      // The completion endpoint takes a boolean on purpose: the card emits the state
-      // it wants, so two fast clicks ask for the same thing rather than racing.
+      // The completion endpoint takes a boolean on purpose: the card sends the state
+      // it wants, so two fast presses ask for the same thing rather than racing.
       const wrapper = mount(Card, { props: { task: task({ completed: false }) } })
 
-      await wrapper.get('[aria-pressed]').trigger('click')
+      await stamp(wrapper)
 
-      expect(wrapper.emitted('toggle')).toEqual([[true]])
+      expect(lastUrl()).toBe(`/api/tasks/${ID}/completion`)
+      expect(lastInit().method).toBe('PATCH')
+      expect(lastBody()).toEqual({ completed: true })
     })
 
     it('asks to reopen a task that is already done', async () => {
       const wrapper = mount(Card, { props: { task: task({ completed: true }) } })
 
+      await stamp(wrapper)
+
+      expect(lastBody()).toEqual({ completed: false })
+    })
+
+    it('sends one request when the mark is pressed twice in a breath', async () => {
+      // The second press asks for the state the first one is already filing, so the
+      // request it would send is one whose answer changes nothing on the board.
+      fetchMock.mockReturnValue(new Promise<Response>(() => {}))
+      const wrapper = mount(Card, { props: { task: task() } })
+
+      await wrapper.get('[aria-pressed]').trigger('click')
       await wrapper.get('[aria-pressed]').trigger('click')
 
-      expect(wrapper.emitted('toggle')).toEqual([[false]])
+      expect(fetchMock).toHaveBeenCalledTimes(1)
+    })
+  })
+
+  describe('蓋章失敗', () => {
+    it('draws no notice while nothing has failed', () => {
+      // The card is a small docket: a row kept in the layout for a message that
+      // is usually absent would cost every card on the shelf its height.
+      const wrapper = mount(Card, { props: { task: task() } })
+
+      expect(wrapper.find('[data-toggle-error]').exists()).toBe(false)
+    })
+
+    it("says the state did not change, in the server's own words", async () => {
+      // The mark is prop-driven, so a refused stamp leaves the card looking exactly
+      // as it did before pressing — indistinguishable from a dead button without this.
+      fetchMock.mockResolvedValue(refused())
+      const wrapper = mount(Card, { props: { task: task() } })
+
+      await stamp(wrapper)
+
+      expect(wrapper.get('[role="alert"]').text()).toContain('這張單子已經不在了。')
+    })
+
+    it('says so even when the request never reached a server', async () => {
+      // `fetch` rejects with a TypeError when the backend is down, which is the
+      // likeliest failure in development and must not escape as an unhandled one.
+      fetchMock.mockRejectedValue(new TypeError('Failed to fetch'))
+      const wrapper = mount(Card, { props: { task: task() } })
+
+      await stamp(wrapper)
+
+      expect(wrapper.get('[role="alert"]').text()).toContain('Failed to fetch')
+    })
+
+    it('lets the mark be pressed again once a refusal has come back, and clears it', async () => {
+      // The guard is released in a `finally`, or one failed stamp would leave the
+      // docket unstampable until the page was reloaded.
+      fetchMock.mockRejectedValueOnce(new TypeError('Failed to fetch'))
+      const wrapper = mount(Card, { props: { task: task() } })
+      await stamp(wrapper)
+
+      await stamp(wrapper)
+
+      expect(fetchMock).toHaveBeenCalledTimes(2)
+      expect(wrapper.find('[data-toggle-error]').exists()).toBe(false)
     })
   })
 

@@ -1,10 +1,11 @@
 <script setup lang="ts">
 /**
- * One task drawn as a paper docket. It renders state and reports intent, deciding
- * nothing; its three states differ in shape as well as colour, never colour alone.
+ * One task drawn as a paper docket. It files its own stamp and passes the menu's two
+ * choices up; its three states differ in shape as well as colour, never colour alone.
  */
 import { computed, ref, useTemplateRef } from 'vue'
 
+import { useTasksStore } from '@/stores/tasks'
 import { categoryDisplay, displayNumber, formatDueDate, isOverdue } from '@/utils/task'
 
 import { LABELS } from './const'
@@ -14,6 +15,12 @@ import type { CardEmits, CardProps } from './types'
 const props = defineProps<CardProps>()
 
 const emit = defineEmits<CardEmits>()
+
+/**
+ * The board's tasks, and the request that stamps one. Written through the store rather
+ * than reported upwards: which shelf this docket hangs on is read off the row below.
+ */
+const tasksStore = useTasksStore()
 
 const number = computed(() => displayNumber(props.task))
 const category = computed(() => categoryDisplay(props.task.category))
@@ -38,6 +45,46 @@ const stub = computed(() => {
 const markLabel = computed(
   () => `狀態：${stateLabel.value}，按下標記為${props.task.completed ? LABELS.open : LABELS.done}`,
 )
+
+/**
+ * Why the last stamp came back refused, or empty while none has. It needs no clearing
+ * on success: a stamp that lands moves the docket, and this card goes with it.
+ */
+const toggleError = ref('')
+
+/**
+ * Whether a stamp is on the wire. A plain `let`: nothing draws it, and a spinner that
+ * appears and vanishes inside a frame is worse than none at all.
+ */
+let stamping = false
+
+/**
+ * Files the state the mark was pressed for, which is what moves the docket to the other
+ * shelf. A refusal is printed on the card, since a refused stamp leaves it right here.
+ *
+ * @param completed - The state being asked for, not the one the card is holding.
+ */
+async function onToggle(completed: boolean): Promise<void> {
+  // A guard rather than a disabled mark: the second press asks for the state the
+  // first one is already filing, so its answer would change nothing on the board.
+  if (stamping) {
+    return
+  }
+
+  // Cleared first: what is on the card is about the previous attempt.
+  toggleError.value = ''
+  stamping = true
+
+  try {
+    await tasksStore.setTaskCompletion(props.task.id, completed)
+  } catch (cause) {
+    // Not only `ApiError`: `fetch` itself rejects with a TypeError when the
+    // backend is not running, which is the likeliest failure in development.
+    toggleError.value = cause instanceof Error ? cause.message : String(cause)
+  } finally {
+    stamping = false
+  }
+}
 
 /**
  * The three-dot button, held so the menu can be hung from it. A ref rather than the
@@ -139,7 +186,7 @@ function onMenuClose(byButton: boolean): void {
               ? 'border-stamp text-stamp'
               : 'border-rule text-ink-2 hover:border-ink-2 hover:text-ink'
           "
-          @click="emit('toggle', !task.completed)"
+          @click="onToggle(!task.completed)"
         >
           <!-- The tick is always drawn and only inked once done, so the box never resizes. -->
           <span
@@ -171,6 +218,23 @@ function onMenuClose(byButton: boolean): void {
           </span>
         </span>
       </div>
+
+      <!--
+        A refused stamp says so here, on the docket that stayed put. Not drawn while
+        empty: a row kept for a message that is usually absent would grow every card.
+        The margin on a stamped card is the strip 完成 DONE sits in — it is positioned
+        against the card, and without it the reason would run under the stamp.
+      -->
+      <p
+        v-if="toggleError"
+        data-toggle-error
+        role="alert"
+        class="mt-2 border-l-[3px] border-alert bg-alert-bg px-2 py-[5px] text-[11.5px] leading-[1.5] text-ink-2 [overflow-wrap:anywhere]"
+        :class="task.completed ? 'mb-[30px]' : undefined"
+      >
+        <strong class="font-display font-semibold text-alert">狀態沒改到</strong>
+        —— {{ toggleError }}
+      </p>
     </div>
 
     <!-- The card's only control besides the mark; everything else lives in the menu. -->

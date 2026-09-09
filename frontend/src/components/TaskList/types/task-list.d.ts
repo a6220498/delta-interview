@@ -28,8 +28,6 @@ export interface TaskListProps {
  * list is the last place that knows which card is which.
  */
 export interface TaskListEmits {
-  /** A card asked to change completion state, carrying the task it belongs to. */
-  toggle: [task: TaskSummary, completed: boolean]
   /** A card's 編輯 was chosen, carrying the task it belongs to. */
   edit: [task: TaskSummary]
   /** A card's 刪除 was chosen, carrying the task it belongs to. */

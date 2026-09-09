@@ -2,10 +2,17 @@ import { TASK_RACKS } from '@/const/task'
 import type { TaskRack } from '@/const/task'
 import type { TaskSummary } from '@/types/task'
 import { mount } from '@vue/test-utils'
-import { describe, expect, it } from 'vitest'
+import { createPinia, setActivePinia } from 'pinia'
+import { beforeEach, describe, expect, it } from 'vitest'
 
 import Card from './Card.vue'
 import TaskList from './index.vue'
+
+beforeEach(() => {
+  // Stacking a shelf mounts cards, and a card reaches for the store to file its own
+  // stamp. Nothing here presses the mark, so an empty board of its own is enough.
+  setActivePinia(createPinia())
+})
 
 /**
  * Builds one of the rows the board hands down. A `TaskSummary`, not a `Task`: the
@@ -155,17 +162,9 @@ describe('TaskList', () => {
   })
 
   describe('forwarding', () => {
-    it('passes a completion request up with the task it belongs to', async () => {
+    it('passes an edit request up with the task it belongs to', async () => {
       // Deliberately not the first card: the list must attach the task the
       // event actually came from, not whichever one it rendered first.
-      const wrapper = mountList(three)
-
-      await cardAt(wrapper, 1).vm.$emit('toggle', true)
-
-      expect(wrapper.emitted('toggle')).toEqual([[readme, true]])
-    })
-
-    it('passes an edit request up with the task it belongs to', async () => {
       const wrapper = mountList(three)
 
       await cardAt(wrapper, 2).vm.$emit('edit')
